@@ -1,0 +1,47 @@
+name: Deploy to DigitalOcean
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install doctl
+        uses: digitalocean/action-doctl@v2
+        with:
+          token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+
+      - name: Deploy to App Platform
+        run: |
+          # Get the app ID from the spec or use environment variable
+          APP_ID=${{ secrets.DO_APP_ID }}
+          
+          if [ -z "$APP_ID" ]; then
+            echo "Creating new app..."
+            doctl apps create --spec .do/app.yaml
+          else
+            echo "Updating existing app..."
+            doctl apps update $APP_ID --spec .do/app.yaml
+          fi
+
+      - name: Wait for deployment
+        run: |
+          echo "Waiting for deployment to complete..."
+          sleep 30
+          doctl apps list
+
+      - name: Notify deployment status
+        if: always()
+        run: |
+          if [ ${{ job.status }} == 'success' ]; then
+            echo "✅ Deployment successful!"
+          else
+            echo "❌ Deployment failed!"
+          fi

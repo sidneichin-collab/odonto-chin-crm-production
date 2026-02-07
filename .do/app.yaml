@@ -1,0 +1,42 @@
+name: odonto-chin-crm
+region: nyc
+services:
+  - name: web
+    github:
+      repo: sidneichin-collab/odonto-chin-crm-multitenant
+      branch: main
+      deploy_on_push: true
+    build_command: pnpm install && pnpm run build
+    run_command: pnpm run start
+    environment_slug: node-js
+    instance_count: 1
+    instance_size_slug: basic-xxs
+    http_port: 3000
+    routes:
+      - path: /
+    envs:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "3000"
+      - key: DATABASE_URL
+        type: SECRET
+        scope: RUN_TIME
+      - key: JWT_SECRET
+        type: SECRET
+        scope: RUN_TIME
+      - key: EVOLUTION_API_URL
+        value: http://95.111.240.243:8080
+      - key: EVOLUTION_API_KEY
+        value: OdontoChinSecretKey2026
+      - key: N8N_WEBHOOK_URL
+        value: https://odontochicrmsecretaria.app.n8n.cloud/webhook-test/8eef988c5-64bc-4bf0-8a6b-1eb5af717feb
+      - key: VITE_APP_TITLE
+        value: Odonto Chin CRM
+      - key: VITE_APP_LOGO
+        value: /logo.png
+databases:
+  - name: odonto-chin-db
+    engine: PG
+    production: true
+    version: "14"
