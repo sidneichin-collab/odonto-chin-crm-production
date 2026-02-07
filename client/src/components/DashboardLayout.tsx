@@ -27,7 +27,7 @@ import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
 import { Button } from "./ui/button";
 
-import { Calendar, Clock, AlertTriangle, MessageSquare, Building2, Activity } from "lucide-react";
+import { Calendar, Clock, AlertTriangle, MessageSquare, Building2, Activity, Radio, BarChart3, ClipboardList, FileText } from "lucide-react";
 
 const menuItems = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/" },
@@ -41,6 +41,10 @@ const menuItems = [
   { icon: Calendar, label: "Agendamientos", path: "/agendamientos", hasDropdown: true },
   { icon: Bell, label: "Recordatorios", path: "/recordatorios", hasDropdown: true },
   { icon: Mail, label: "Comunicación", path: "/comunicacion", hasDropdown: true },
+  { icon: Radio, label: "Canales WhatsApp", path: "/canales-whatsapp", hasDropdown: true },
+  { icon: BarChart3, label: "Estadísticas Sillones", path: "/estadisticas-sillones" },
+  { icon: ClipboardList, label: "Lista de Espera", path: "/lista-espera" },
+  { icon: FileText, label: "Relatório Inadimplência", path: "/relatorio-inadimplencia" },
 ];
 
 const SIDEBAR_WIDTH_KEY = "sidebar-width";
