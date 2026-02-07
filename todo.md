@@ -116,3 +116,21 @@
 **Total de tareas:** 75+  
 **Estado:** Iniciando desarrollo  
 **Prioridad:** Alta - Sistema crítico para 68+ clínicas
+
+
+## 🎨 Adaptação de Design (Versão Anterior)
+- [x] Trocar tema escuro por cores vibrantes
+- [x] Redesenhar cards do dashboard com cores (azul, verde, laranja, roxo, vermelho)
+- [x] Adicionar subtitle "para secretarias" no header
+- [x] Criar botão "Ver Agenda" ciano no topo direito
+- [x] Expandir sidebar com novos módulos
+- [x] Adicionar módulo "Pacientes Marketing"
+- [x] Adicionar módulo "Follow Up"
+- [x] Adicionar módulo "Guardian IA" com dropdown
+- [x] Adicionar módulo "Calculadora ROI"
+- [x] Adicionar módulo "Envío Automático"
+- [x] Adicionar módulo "Recordatorios" com dropdown
+- [x] Adicionar seção "Día Siguiente - sábado, 07 de febrero"
+- [x] Criar cards de status (Confirmadas, Pendientes, Canceladas)
+- [ ] Adicionar calendário no top-right para seleção de dia/mês
+- [x] Implementar contadores clicáveis para citas

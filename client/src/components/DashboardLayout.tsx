@@ -21,21 +21,26 @@ import {
 } from "@/components/ui/sidebar";
 import { getLoginUrl } from "@/const";
 import { useIsMobile } from "@/hooks/useMobile";
-import { LayoutDashboard, LogOut, PanelLeft, Users } from "lucide-react";
+import { LayoutDashboard, LogOut, PanelLeft, Users, Calculator, Send, Bot, TrendingUp, Bell, Mail, ChevronDown } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
 import { Button } from "./ui/button";
 
-import { Calendar, Clock, AlertTriangle, MessageSquare, Building2 } from "lucide-react";
+import { Calendar, Clock, AlertTriangle, MessageSquare, Building2, Activity } from "lucide-react";
 
 const menuItems = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/" },
-  { icon: Users, label: "Pacientes", path: "/pacientes" },
-  { icon: Calendar, label: "Agendamientos", path: "/agendamientos" },
-  { icon: Clock, label: "Lista de Espera", path: "/lista-espera" },
-  { icon: AlertTriangle, label: "En Riesgo", path: "/en-riesgo" },
-  { icon: MessageSquare, label: "WhatsApp", path: "/whatsapp" },
+  { icon: Users, label: "Pacientes Activos", path: "/pacientes", hasDropdown: true },
+  { icon: AlertTriangle, label: "Pacientes en Riesgo", path: "/pacientes-riesgo" },
+  { icon: TrendingUp, label: "Pacientes Marketing", path: "/pacientes-marketing" },
+  { icon: Activity, label: "Follow Up", path: "/follow-up" },
+  { icon: Bot, label: "Guardian IA", path: "/guardian-ia", hasDropdown: true },
+  { icon: Calculator, label: "Calculadora ROI", path: "/calculadora-roi" },
+  { icon: Send, label: "Envío Automático", path: "/envio-automatico" },
+  { icon: Calendar, label: "Agendamientos", path: "/agendamientos", hasDropdown: true },
+  { icon: Bell, label: "Recordatorios", path: "/recordatorios", hasDropdown: true },
+  { icon: Mail, label: "Comunicación", path: "/comunicacion", hasDropdown: true },
 ];
 
 const SIDEBAR_WIDTH_KEY = "sidebar-width";
@@ -179,8 +184,8 @@ function DashboardLayoutContent({
                   <div className="flex items-center gap-2">
                     <Building2 className="h-5 w-5 text-primary" />
                     <div>
-                      <span className="font-semibold tracking-tight block">Odonto Chin</span>
-                      <span className="text-xs text-muted-foreground">CRM Dental</span>
+                      <span className="font-semibold tracking-tight block">ODONTO CHIN</span>
+                      <span className="text-xs text-muted-foreground">para secretarias</span>
                     </div>
                   </div>
                 </div>
