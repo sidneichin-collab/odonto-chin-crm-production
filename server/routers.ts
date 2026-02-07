@@ -101,6 +101,15 @@ export const appRouter = router({
       const tenantId = ctx.user.tenantId!;
       return await db.getDashboardStats(tenantId);
     }),
+
+    statsByDate: tenantProcedure
+      .input(z.object({
+        date: z.string(), // ISO date string
+      }))
+      .query(async ({ ctx, input }) => {
+        const tenantId = ctx.user.tenantId!;
+        return await db.getDashboardStatsByDate(tenantId, input.date);
+      }),
   }),
 
   // ============================================================================

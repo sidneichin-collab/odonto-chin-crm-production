@@ -8,10 +8,20 @@ import { useEffect, useState } from "react";
 
 export default function DashboardFinal() {
   const [, setLocation] = useLocation();
-  const { data: stats, isLoading, refetch } = trpc.dashboard.stats.useQuery();
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [currentMonth, setCurrentMonth] = useState(new Date());
+  
+  // Use statsByDate query with selected date
+  const { data: stats, isLoading, refetch } = trpc.dashboard.statsByDate.useQuery({
+    date: selectedDate.toISOString().split('T')[0], // Format: YYYY-MM-DD
+  });
 
+  // Refetch when selectedDate changes
+  useEffect(() => {
+    refetch();
+  }, [selectedDate, refetch]);
+
+  // Auto-refresh every 30 seconds
   useEffect(() => {
     const interval = setInterval(() => {
       refetch();
@@ -187,7 +197,7 @@ export default function DashboardFinal() {
                 <CalendarIcon className="h-5 w-5 text-white" />
               </div>
               <div className="text-5xl font-bold text-white mb-2">
-                {stats?.todayAppointments || 0}
+                {stats?.citasTotal || 0}
               </div>
               <p className="text-blue-100 text-xs">Consultas agendadas para hoy</p>
               <p className="text-blue-200 text-xs mt-1">Clic para ver pacientes</p>
@@ -205,7 +215,7 @@ export default function DashboardFinal() {
                 <CheckCircle className="h-5 w-5 text-white" />
               </div>
               <div className="text-5xl font-bold text-white mb-2">
-                {Math.floor((stats?.todayAppointments || 0) * 0.6)}
+                {(stats?.ortodonciaConfirmadas || 0) + (stats?.clinicoConfirmadas || 0)}
               </div>
               <p className="text-green-100 text-xs">Pacientes confirmaron asistencia</p>
               <p className="text-green-200 text-xs mt-1">Clic para ver pacientes</p>
@@ -223,7 +233,7 @@ export default function DashboardFinal() {
                 <Clock className="h-5 w-5 text-white" />
               </div>
               <div className="text-5xl font-bold text-white mb-2">
-                {Math.floor((stats?.todayAppointments || 0) * 0.4)}
+                {(stats?.ortodonciaPendientes || 0) + (stats?.clinicoPendientes || 0)}
               </div>
               <p className="text-orange-100 text-xs">Esperando confirmación</p>
               <p className="text-orange-200 text-xs mt-1">Clic para ver pacientes</p>
@@ -241,7 +251,7 @@ export default function DashboardFinal() {
                 <Users className="h-5 w-5 text-white" />
               </div>
               <div className="text-5xl font-bold text-white mb-2">
-                0
+                {stats?.completadas || 0}
               </div>
               <p className="text-purple-100 text-xs">Consultas finalizadas hoy</p>
               <p className="text-purple-200 text-xs mt-1">Clic para ver pacientes</p>
@@ -309,6 +319,18 @@ export default function DashboardFinal() {
           </div>
         </div>
       </div>
+
+      {/* Floating Action Button for Quick Appointment */}
+      <button
+        onClick={() => setLocation("/agendamientos")}
+        className="fixed bottom-8 right-8 w-16 h-16 bg-cyan-500 hover:bg-cyan-600 text-white rounded-full shadow-lg hover:shadow-xl transition-all flex items-center justify-center z-50 group"
+        aria-label="Agendamiento rápido"
+      >
+        <span className="text-4xl font-light leading-none">+</span>
+        <span className="absolute right-20 bg-gray-900 text-white text-sm px-3 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+          Agendamiento Rápido
+        </span>
+      </button>
     </DashboardLayout>
   );
 }

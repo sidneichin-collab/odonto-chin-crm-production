@@ -355,6 +355,136 @@ export async function getDashboardStats(tenantId: number) {
     atRiskPatients: Number(atRiskCount?.count || 0),
   };
 }
+// This is a temporary file to add the new function
+// Insert this after getDashboardStats function (around line 357)
+
+export async function getDashboardStatsByDate(tenantId: number, dateStr: string) {
+  const db = await getDb();
+  if (!db) return null;
+
+  // Parse the date string (ISO format: YYYY-MM-DD)
+  const targetDate = new Date(dateStr);
+  const nextDate = new Date(targetDate);
+  nextDate.setDate(nextDate.getDate() + 1);
+
+  // Format dates for SQL comparison
+  const targetDateStr = targetDate.toISOString().split('T')[0];
+  const nextDateStr = nextDate.toISOString().split('T')[0];
+
+  // Count appointments for the selected date by type and status
+  const [ortodonciaConfirmadas] = await db.select({ count: sql<number>`count(*)` })
+    .from(appointments)
+    .where(
+      and(
+        eq(appointments.tenantId, tenantId),
+        sql`DATE(${appointments.appointmentDate}) = ${targetDateStr}`,
+        sql`${appointments.type} = 'Ortodontia'`,
+        eq(appointments.status, "Confirmado")
+      )
+    );
+
+  const [ortodonciaPendientes] = await db.select({ count: sql<number>`count(*)` })
+    .from(appointments)
+    .where(
+      and(
+        eq(appointments.tenantId, tenantId),
+        sql`DATE(${appointments.appointmentDate}) = ${targetDateStr}`,
+        sql`${appointments.type} = 'Ortodontia'`,
+        eq(appointments.status, "Pendiente")
+      )
+    );
+
+  const [clinicoConfirmadas] = await db.select({ count: sql<number>`count(*)` })
+    .from(appointments)
+    .where(
+      and(
+        eq(appointments.tenantId, tenantId),
+        sql`DATE(${appointments.appointmentDate}) = ${targetDateStr}`,
+        sql`${appointments.type} = 'Clínico General'`,
+        eq(appointments.status, "Confirmado")
+      )
+    );
+
+  const [clinicoPendientes] = await db.select({ count: sql<number>`count(*)` })
+    .from(appointments)
+    .where(
+      and(
+        eq(appointments.tenantId, tenantId),
+        sql`DATE(${appointments.appointmentDate}) = ${targetDateStr}`,
+        sql`${appointments.type} = 'Clínico General'`,
+        eq(appointments.status, "Pendiente")
+      )
+    );
+
+  const [completadas] = await db.select({ count: sql<number>`count(*)` })
+    .from(appointments)
+    .where(
+      and(
+        eq(appointments.tenantId, tenantId),
+        sql`DATE(${appointments.appointmentDate}) = ${targetDateStr}`,
+        eq(appointments.status, "Completado")
+      )
+    );
+
+  const [citasTotal] = await db.select({ count: sql<number>`count(*)` })
+    .from(appointments)
+    .where(
+      and(
+        eq(appointments.tenantId, tenantId),
+        sql`DATE(${appointments.appointmentDate}) = ${targetDateStr}`
+      )
+    );
+
+  // Count appointments for tomorrow (next day)
+  const [mananaConfirmadas] = await db.select({ count: sql<number>`count(*)` })
+    .from(appointments)
+    .where(
+      and(
+        eq(appointments.tenantId, tenantId),
+        sql`DATE(${appointments.appointmentDate}) = ${nextDateStr}`,
+        eq(appointments.status, "Confirmado")
+      )
+    );
+
+  const [mananaPendientes] = await db.select({ count: sql<number>`count(*)` })
+    .from(appointments)
+    .where(
+      and(
+        eq(appointments.tenantId, tenantId),
+        sql`DATE(${appointments.appointmentDate}) = ${nextDateStr}`,
+        eq(appointments.status, "Pendiente")
+      )
+    );
+
+  const [mananaCanceladas] = await db.select({ count: sql<number>`count(*)` })
+    .from(appointments)
+    .where(
+      and(
+        eq(appointments.tenantId, tenantId),
+        sql`DATE(${appointments.appointmentDate}) = ${nextDateStr}`,
+        eq(appointments.status, "Cancelado")
+      )
+    );
+
+  return {
+    // Today's appointments
+    ortodonciaConfirmadas: Number(ortodonciaConfirmadas?.count || 0),
+    ortodonciaPendientes: Number(ortodonciaPendientes?.count || 0),
+    clinicoConfirmadas: Number(clinicoConfirmadas?.count || 0),
+    clinicoPendientes: Number(clinicoPendientes?.count || 0),
+    completadas: Number(completadas?.count || 0),
+    citasTotal: Number(citasTotal?.count || 0),
+    
+    // Tomorrow's appointments
+    mananaConfirmadas: Number(mananaConfirmadas?.count || 0),
+    mananaPendientes: Number(mananaPendientes?.count || 0),
+    mananaCanceladas: Number(mananaCanceladas?.count || 0),
+    
+    // Date info
+    selectedDate: targetDateStr,
+    nextDate: nextDateStr,
+  };
+}
 
 // ============================================================================
 // AUDIT LOGGING

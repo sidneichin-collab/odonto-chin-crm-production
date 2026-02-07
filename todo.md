@@ -155,3 +155,25 @@
   - [x] Relatório Inadimplência
 - [ ] Remover módulos antigos não presentes na imagem
 - [ ] Ajustar espaçamento e layout para ficar idêntico à referência
+
+
+## 📅 Navegação por Data no Calendário
+- [ ] Criar procedimento tRPC `dashboard.statsByDate` para buscar dados por data específica
+- [ ] Modificar procedimento para aceitar parâmetro `date` (ISO string)
+- [ ] Retornar contadores separados por tipo (Ortodontia Confirmadas, Ortodontia Pendientes, etc.)
+- [ ] Atualizar Dashboard para usar `selectedDate` ao invés de data atual
+- [ ] Implementar `useEffect` para refetch quando `selectedDate` mudar
+- [ ] Atualizar cards "Citas de Hoy" para mostrar data selecionada
+- [ ] Atualizar seção "Citas de Mañana" para mostrar dia seguinte à data selecionada
+- [ ] Garantir que botão "Hoy" reseta para data atual
+- [ ] Testar navegação entre diferentes dias do mês
+- [ ] Testar navegação entre diferentes meses
+- [ ] Verificar que contadores atualizam corretamente
+
+
+## ➕ Botão de Agendamento Rápido
+- [ ] Adicionar botão redondo "+" flutuante no dashboard (canto inferior direito)
+- [ ] Botão deve ter cor ciano (#06b6d4) para destaque
+- [ ] Ao clicar, abrir modal "Cadastro Rápido de Paciente"
+- [ ] Modal deve ter formulário simplificado (Nome, Telefone, Email, Data de Nascimento)
+- [ ] Após cadastro, redirecionar para página de agendamentos
