@@ -1,0 +1,25 @@
+{
+  "query": "INSERT INTO users (openId, name, email, role, createdAt)\nVALUES ('super-admin-001', 'Super Admin', 'admin@odontochin.com', 'super-admin', NOW())\nON DUPLICATE KEY UPDATE \n  name = 'Super Admin',\n  role = 'super-admin';\n\nINSERT INTO tenants (name, email, phone, whatsappNumber, whatsappInstanceId, createdAt)\nVALUES ('Clínica Principal', 'principal@odontochin.com', '+59112345678', '+59112345678', 'CHINRMREPLIT', NOW())\nON DUPLICATE KEY UPDATE \n  name = 'Clínica Principal';\n\nSELECT * FROM users WHERE email = 'admin@odontochin.com';\nSELECT * FROM tenants WHERE name = 'Clínica Principal';",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3dy73aS7obdDVgV.50fc725bbc0f --database 5qJU6ohjtk6MKsEXbKN2Hx --execute INSERT INTO users (openId, name, email, role, createdAt)\nVALUES ('super-admin-001', 'Super Admin', 'admin@odontochin.com', 'super-admin', NOW())\nON DUPLICATE KEY UPDATE \n  name = 'Super Admin',\n  role = 'super-admin';\n\nINSERT INTO tenants (name, email, phone, whatsappNumber, whatsappInstanceId, createdAt)\nVALUES ('Clínica Principal', 'principal@odontochin.com', '+59112345678', '+59112345678', 'CHINRMREPLIT', NOW())\nON DUPLICATE KEY UPDATE \n  name = 'Clínica Principal';\n\nSELECT * FROM users WHERE email = 'admin@odontochin.com';\nSELECT * FROM tenants WHERE name = 'Clínica Principal';",
+  "rows": [
+    {
+      "id": "60009",
+      "openId": "super-admin-001",
+      "name": "Super Admin",
+      "email": "admin@odontochin.com",
+      "loginMethod": "NULL",
+      "role": "super-admin",
+      "createdAt": "2026-02-07 18:31:48",
+      "updatedAt": "2026-02-07 18:31:48",
+      "lastSignedIn": "2026-02-07 18:31:48",
+      "tenantId": "NULL"
+    }
+  ],
+  "messages": [
+    "id\tname\temail\tphone\taddress\tcity\tcountry\twhatsappNumber\twhatsappInstanceId\ttimezone\tlanguage\tisActive\tcreatedAt\tupdatedAt",
+    "1\tClínica Principal\tprincipal@odontochin.com\t+59112345678\tNULL\tNULL\tNULL\t+59112345678\tCHINRMREPLIT\tAmerica/La_Paz\tes\t1\t2026-02-07 18:32:03\t2026-02-07 18:32:03"
+  ],
+  "stdout": "id\topenId\tname\temail\tloginMethod\trole\tcreatedAt\tupdatedAt\tlastSignedIn\ttenantId\n60009\tsuper-admin-001\tSuper Admin\tadmin@odontochin.com\tNULL\tsuper-admin\t2026-02-07 18:31:48\t2026-02-07 18:31:48\t2026-02-07 18:31:48\tNULL\nid\tname\temail\tphone\taddress\tcity\tcountry\twhatsappNumber\twhatsappInstanceId\ttimezone\tlanguage\tisActive\tcreatedAt\tupdatedAt\n1\tClínica Principal\tprincipal@odontochin.com\t+59112345678\tNULL\tNULL\tNULL\t+59112345678\tCHINRMREPLIT\tAmerica/La_Paz\tes\t1\t2026-02-07 18:32:03\t2026-02-07 18:32:03\n",
+  "stderr": "",
+  "execution_time_ms": 509
+}

@@ -187,3 +187,24 @@
 - [ ] Corrigir erro de tipo no procedimento
 - [ ] Testar dashboard após correção
 - [ ] Criar checkpoint após correção
+
+
+## 🚀 Deployment DigitalOcean - URGENTE
+
+- [ ] Remover dependencia de Manus OAuth del código
+- [ ] Crear sistema de login directo con JWT
+- [ ] Modificar frontend para usar login directo sin OAuth
+- [ ] Configurar conexión con Evolution API en Contabo (95.111.240.243:8080)
+- [ ] Actualizar variables de ambiente para producción
+- [ ] Reconstruir aplicación con cambios
+- [ ] Redesplegar en Droplet DigitalOcean (178.128.4.51)
+- [ ] Verificar que CRM carga sin error 404
+- [ ] Crear usuario Master Admin inicial
+- [ ] Testing completo de todas las funcionalidades
+
+
+## 🐛 Bug Fix URGENTE - Guardar Paciente
+- [ ] Diagnosticar error al guardar paciente en formulario
+- [ ] Verificar procedimiento tRPC de creación de paciente
+- [ ] Revisar validación de datos en backend
+- [ ] Corregir error y verificar funcionamiento
