@@ -177,3 +177,13 @@
 - [ ] Ao clicar, abrir modal "Cadastro Rápido de Paciente"
 - [ ] Modal deve ter formulário simplificado (Nome, Telefone, Email, Data de Nascimento)
 - [ ] Após cadastro, redirecionar para página de agendamentos
+
+
+## 🐛 Correção de Erro tRPC
+
+- [x] Investigar erro "Unexpected token '<', "<!doctype "... is not valid JSON"
+- [x] Verificar logs do servidor para identificar qual procedimento está falhando
+- [x] Verificar se o procedimento `dashboard.statsByDate` está retornando corretamente
+- [ ] Corrigir erro de tipo no procedimento
+- [ ] Testar dashboard após correção
+- [ ] Criar checkpoint após correção
