@@ -4,13 +4,23 @@ import NotFound from "@/pages/NotFound";
 import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
-import Home from "./pages/Home";
+import Dashboard from "./pages/Dashboard";
+import Pacientes from "./pages/Pacientes";
+import Agendamientos from "./pages/Agendamientos";
+import ListaEspera from "./pages/ListaEspera";
+import PacientesRiesgo from "./pages/PacientesRiesgo";
+import WhatsApp from "./pages/WhatsApp";
 
 function Router() {
   // make sure to consider if you need authentication for certain routes
   return (
     <Switch>
-      <Route path={"/"} component={Home} />
+      <Route path={"/"} component={Dashboard} />
+      <Route path={"/pacientes"} component={Pacientes} />
+      <Route path={"/agendamientos"} component={Agendamientos} />
+      <Route path={"/lista-espera"} component={ListaEspera} />
+      <Route path={"/pacientes-riesgo"} component={PacientesRiesgo} />
+      <Route path={"/whatsapp"} component={WhatsApp} />
       <Route path={"/404"} component={NotFound} />
       {/* Final fallback route */}
       <Route component={NotFound} />
@@ -27,7 +37,7 @@ function App() {
   return (
     <ErrorBoundary>
       <ThemeProvider
-        defaultTheme="light"
+        defaultTheme="dark"
         // switchable
       >
         <TooltipProvider>
