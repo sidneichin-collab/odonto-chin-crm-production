@@ -12,7 +12,7 @@ export const appRouter = router({
       const stats = await db.getDashboardStats(DEFAULT_TENANT_ID);
       return stats;
     }),
-    getStatsByDate: publicProcedure
+    statsByDate: publicProcedure
       .input(z.object({ date: z.string() }))
       .query(async ({ input }: { input: { date: string } }) => {
         const stats = await db.getDashboardStatsByDate(DEFAULT_TENANT_ID, input.date);

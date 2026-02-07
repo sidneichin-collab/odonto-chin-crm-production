@@ -208,3 +208,10 @@
 - [ ] Verificar procedimiento tRPC de creación de paciente
 - [ ] Revisar validación de datos en backend
 - [ ] Corregir error y verificar funcionamiento
+
+
+## 🔧 Correção Endpoint Dashboard - URGENTE
+- [ ] Corrigir incompatibilidade de nome do endpoint dashboard.statsByDate
+- [ ] Sincronizar nomes entre frontend (statsByDate) e backend (getStatsByDate)
+- [ ] Testar correção no Manus
+- [ ] Deploy no DigitalOcean
