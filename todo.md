@@ -215,3 +215,9 @@
 - [ ] Sincronizar nomes entre frontend (statsByDate) e backend (getStatsByDate)
 - [ ] Testar correção no Manus
 - [ ] Deploy no DigitalOcean
+
+
+## 🔧 Correção Rotas - URGENTE
+- [ ] Adicionar todas as rotas no App.tsx (pacientes, agendamentos, etc)
+- [ ] Testar navegação entre páginas
+- [ ] Deploy no DigitalOcean
