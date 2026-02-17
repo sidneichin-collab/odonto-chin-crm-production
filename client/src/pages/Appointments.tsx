@@ -46,7 +46,7 @@ const TIME_SLOTS = Array.from({ length: 31 }, (_, i) => {
   const hour = Math.floor(i * 20 / 60) + 8;
   const minute = (i * 20) % 60;
   return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
-});
+}).filter(time => time <= "18:00");
 
 function GridCell({
   columnId,
