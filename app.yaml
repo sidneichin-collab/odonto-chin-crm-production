@@ -1,0 +1,49 @@
+name: odonto-chin-crm
+services:
+- name: web
+  github:
+    branch: main
+    repo: your-username/odonto-chin-crm
+  build_command: pnpm run build
+  run_command: node server/_core/index.ts
+  http_port: 3000
+  envs:
+  - key: NODE_ENV
+    value: production
+  - key: DATABASE_URL
+    value: ${db.connection_string}
+  - key: JWT_SECRET
+    scope: RUN_AND_BUILD_TIME
+    value: ${JWT_SECRET}
+  - key: OAUTH_SERVER_URL
+    value: https://${APP_DOMAIN}
+  health_check:
+    http_path: /health
+  http_port: 3000
+  source_dir: /
+
+- name: db
+  engine: MYSQL
+  version: "8"
+  production: true
+  envs:
+  - key: MYSQL_ROOT_PASSWORD
+    scope: RUN_TIME
+    value: ${DB_PASSWORD}
+  - key: MYSQL_DATABASE
+    value: odonto_chin_crm
+
+static_sites:
+- name: static
+  source_dir: dist
+
+databases:
+- name: db
+  engine: MYSQL
+  version: "8"
+  production: true
+
+domains:
+- domain: odontochin-crm.app
+  type: PRIMARY
+

@@ -1,0 +1,9 @@
+{
+  "query": "CREATE TABLE IF NOT EXISTS `reminder_responses` (\n  `id` int NOT NULL AUTO_INCREMENT PRIMARY KEY,\n  `appointment_id` int NOT NULL,\n  `patient_id` int NOT NULL,\n  `message_text` text NOT NULL,\n  `detected_intent` enum('confirmed','cancelled','reschedule','unknown'),\n  `detected_keywords` varchar(500),\n  `received_at` timestamp NOT NULL,\n  `processed` tinyint NOT NULL DEFAULT 0,\n  `processed_at` timestamp NULL,\n  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,\n  KEY `idx_intent` (`detected_intent`),\n  KEY `idx_processed` (`processed`),\n  FOREIGN KEY (`appointment_id`) REFERENCES `appointments`(`id`) ON DELETE CASCADE,\n  FOREIGN KEY (`patient_id`) REFERENCES `patients`(`id`) ON DELETE CASCADE\n)",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3dy73aS7obdDVgV.73116cb9d21b --database Xh2xRagQAoY5NjF5TC3DfV --execute CREATE TABLE IF NOT EXISTS `reminder_responses` (\n  `id` int NOT NULL AUTO_INCREMENT PRIMARY KEY,\n  `appointment_id` int NOT NULL,\n  `patient_id` int NOT NULL,\n  `message_text` text NOT NULL,\n  `detected_intent` enum('confirmed','cancelled','reschedule','unknown'),\n  `detected_keywords` varchar(500),\n  `received_at` timestamp NOT NULL,\n  `processed` tinyint NOT NULL DEFAULT 0,\n  `processed_at` timestamp NULL,\n  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,\n  KEY `idx_intent` (`detected_intent`),\n  KEY `idx_processed` (`processed`),\n  FOREIGN KEY (`appointment_id`) REFERENCES `appointments`(`id`) ON DELETE CASCADE,\n  FOREIGN KEY (`patient_id`) REFERENCES `patients`(`id`) ON DELETE CASCADE\n)",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 591
+}

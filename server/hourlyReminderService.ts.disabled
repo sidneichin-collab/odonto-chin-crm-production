@@ -1,0 +1,201 @@
+/**
+ * Hourly Reminder Service
+ * 
+ * Gerencia envio de recordatórios a cada 1 hora até 19h
+ * Integra com Evolution API para WhatsApp
+ */
+
+import { sendReminderMessage } from "./whatsappReminderService";
+import { getTemplateForHour, postAttendanceTemplate, fillTemplate } from "./hourlyReminderTemplates";
+
+export interface PatientAppointment {
+  patientName: string;
+  patientPhone: string;
+  appointmentDate: string;
+  appointmentTime: string;
+  appointmentType: string;
+}
+
+/**
+ * Enviar recordatório para uma hora específica
+ */
+export async function sendHourlyReminder(
+  appointment: PatientAppointment,
+  hour: number
+): Promise<{ success: boolean; message: string; details?: any }> {
+  const template = getTemplateForHour(hour);
+
+  if (!template) {
+    return {
+      success: false,
+      message: `Nenhum template disponível para hora ${hour}`,
+    };
+  }
+
+  // Formatar mensagem com dados do paciente
+  const formattedMessage = fillTemplate(template.template, {
+    patientName: appointment.patientName,
+    appointmentTime: appointment.appointmentTime,
+  });
+
+  try {
+    const result = await sendReminderMessage({
+      patientName: appointment.patientName,
+      patientPhone: appointment.patientPhone,
+      appointmentDate: appointment.appointmentDate,
+      appointmentTime: appointment.appointmentTime,
+      appointmentType: appointment.appointmentType,
+      messageTemplate: formattedMessage,
+      urgencyLevel: template.urgencyLevel,
+    });
+
+    if (result.success) {
+      console.log(
+        `[Hourly] ✅ Recordatório ${hour}h enviado para ${appointment.patientName}`
+      );
+    } else {
+      console.error(
+        `[Hourly] ❌ Erro ao enviar recordatório ${hour}h para ${appointment.patientName}: ${result.message}`
+      );
+    }
+
+    return result;
+  } catch (error: any) {
+    console.error(`[Hourly] Erro ao enviar recordatório ${hour}h:`, error);
+    return {
+      success: false,
+      message: `Erro ao enviar recordatório: ${error.message}`,
+      details: error,
+    };
+  }
+}
+
+/**
+ * Enviar recordatórios para todos os pacientes em uma hora específica
+ */
+export async function sendHourlyRemindersForAll(
+  appointments: PatientAppointment[],
+  hour: number
+): Promise<{ success: number; failed: number; results: any[] }> {
+  console.log(
+    `[Hourly] Enviando recordatórios ${hour}h para ${appointments.length} pacientes`
+  );
+
+  const results = await Promise.all(
+    appointments.map(appointment => sendHourlyReminder(appointment, hour))
+  );
+
+  const successCount = results.filter(r => r.success).length;
+  const failureCount = results.filter(r => !r.success).length;
+
+  console.log(
+    `[Hourly] Resultado: ${successCount} sucesso, ${failureCount} falhas`
+  );
+
+  return {
+    success: successCount,
+    failed: failureCount,
+    results,
+  };
+}
+
+/**
+ * Enviar pós-atendimento (2 horas após a consulta)
+ */
+export async function sendPostAttendanceMessage(
+  appointment: PatientAppointment,
+  templateType: "default" | "educational" | "transformation" = "default"
+): Promise<{ success: boolean; message: string; details?: any }> {
+  let messageTemplate: string;
+
+  // Usar template de pós-atendimento
+  messageTemplate = fillTemplate(postAttendanceTemplate, {
+    patientName: appointment.patientName,
+    appointmentTime: appointment.appointmentTime,
+  });
+
+  try {
+    const result = await sendReminderMessage({
+      patientName: appointment.patientName,
+      patientPhone: appointment.patientPhone,
+      appointmentDate: appointment.appointmentDate,
+      appointmentTime: appointment.appointmentTime,
+      appointmentType: appointment.appointmentType,
+      messageTemplate,
+      urgencyLevel: 5, // Pós-atendimento é mais carinhoso, menos urgente
+    });
+
+    if (result.success) {
+      console.log(
+        `[PostAttendance] ✅ Mensagem pós-atendimento enviada para ${appointment.patientName}`
+      );
+    } else {
+      console.error(
+        `[PostAttendance] ❌ Erro ao enviar pós-atendimento para ${appointment.patientName}: ${result.message}`
+      );
+    }
+
+    return result;
+  } catch (error: any) {
+    console.error(`[PostAttendance] Erro ao enviar pós-atendimento:`, error);
+    return {
+      success: false,
+      message: `Erro ao enviar pós-atendimento: ${error.message}`,
+      details: error,
+    };
+  }
+}
+
+/**
+ * Enviar pós-atendimento para todos os pacientes
+ */
+export async function sendPostAttendanceForAll(
+  appointments: PatientAppointment[],
+  templateType: "default" | "educational" | "transformation" = "transformation"
+): Promise<{ success: number; failed: number; results: any[] }> {
+  console.log(
+    `[PostAttendance] Enviando pós-atendimento para ${appointments.length} pacientes`
+  );
+
+  const results = await Promise.all(
+    appointments.map(appointment =>
+      sendPostAttendanceMessage(appointment, templateType)
+    )
+  );
+
+  const successCount = results.filter(r => r.success).length;
+  const failureCount = results.filter(r => !r.success).length;
+
+  console.log(
+    `[PostAttendance] Resultado: ${successCount} sucesso, ${failureCount} falhas`
+  );
+
+  return {
+    success: successCount,
+    failed: failureCount,
+    results,
+  };
+}
+
+/**
+ * Calcular horários para envio de pós-atendimento
+ * 2 horas após a hora da consulta
+ */
+export function calculatePostAttendanceTime(appointmentTime: string): string {
+  // Parse appointment time (formato: "9h", "10h", "14h30", etc)
+  const timeParts = appointmentTime.match(/(\d+)h?(\d*)/);
+  if (!timeParts) return "";
+
+  let hours = parseInt(timeParts[1]);
+  let minutes = timeParts[2] ? parseInt(timeParts[2]) : 0;
+
+  // Adicionar 2 horas
+  hours += 2;
+
+  // Ajustar se ultrapassar 24 horas
+  if (hours >= 24) {
+    hours -= 24;
+  }
+
+  return `${String(hours).padStart(2, "0")}h${String(minutes).padStart(2, "0")}`;
+}

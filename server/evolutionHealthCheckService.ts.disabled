@@ -1,0 +1,289 @@
+import { notifyOwner } from '../_core/notification';
+
+/**
+ * SERVIÇO DE VALIDAÇÃO E MONITORAMENTO DA EVOLUTION API
+ * 
+ * OBJETIVO: NUNCA MAIS FALHAR NO ENVIO DE MENSAGENS
+ * 
+ * Responsabilidades:
+ * 1. Validar instância WhatsApp ANTES de enviar
+ * 2. Detectar desconexão automaticamente
+ * 3. Alertar o dono em tempo real
+ * 4. Tentar reconectar automaticamente
+ * 5. Registrar TUDO em log para auditoria
+ */
+
+interface HealthCheckResult {
+  isHealthy: boolean;
+  status: 'connected' | 'disconnected' | 'error' | 'unknown';
+  lastCheck: Date;
+  message: string;
+  instanceName: string;
+  apiUrl: string;
+}
+
+interface MessageSendResult {
+  success: boolean;
+  messageId?: string;
+  error?: string;
+  retryCount: number;
+  timestamp: Date;
+}
+
+class EvolutionHealthCheckService {
+  private healthCheckInterval: NodeJS.Timeout | null = null;
+  private lastHealthStatus: Map<string, HealthCheckResult> = new Map();
+  private failureCount: Map<string, number> = new Map();
+  private maxRetries = 3;
+  private retryDelayMs = 2000; // 2 segundos
+
+  /**
+   * Iniciar monitoramento contínuo da Evolution API
+   */
+  startHealthCheck(intervalMs: number = 5 * 60 * 1000) {
+    // 5 minutos
+    if (this.healthCheckInterval) {
+      clearInterval(this.healthCheckInterval);
+    }
+
+    console.log('[EvolutionHealthCheck] Iniciando monitoramento...');
+
+    // Executar imediatamente
+    this.performHealthCheck();
+
+    // Executar periodicamente
+    this.healthCheckInterval = setInterval(() => {
+      this.performHealthCheck();
+    }, intervalMs);
+  }
+
+  /**
+   * Parar monitoramento
+   */
+  stopHealthCheck() {
+    if (this.healthCheckInterval) {
+      clearInterval(this.healthCheckInterval);
+      this.healthCheckInterval = null;
+      console.log('[EvolutionHealthCheck] Monitoramento parado');
+    }
+  }
+
+  /**
+   * Realizar verificação de saúde
+   */
+  private async performHealthCheck() {
+    const instanceName = process.env.EVOLUTION_INSTANCE_NAME || 'unknown';
+    const apiUrl = process.env.EVOLUTION_API_URL || 'unknown';
+
+    console.log(`[EvolutionHealthCheck] Verificando saúde de ${instanceName}...`);
+
+    try {
+      const response = await fetch(`${apiUrl}/instance/info/${instanceName}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${process.env.EVOLUTION_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const isHealthy = response.status === 200;
+      const data = await response.json().catch(() => ({}));
+
+      const result: HealthCheckResult = {
+        isHealthy,
+        status: isHealthy ? 'connected' : 'disconnected',
+        lastCheck: new Date(),
+        message: isHealthy ? 'Instância conectada' : `Status ${response.status}`,
+        instanceName,
+        apiUrl,
+      };
+
+      this.lastHealthStatus.set(instanceName, result);
+
+      if (!isHealthy) {
+        this.handleUnhealthyStatus(result);
+      } else {
+        // Reset failure count se voltou a funcionar
+        this.failureCount.set(instanceName, 0);
+      }
+
+      // Registrar em log
+      await this.logHealthCheck(result);
+    } catch (error) {
+      const result: HealthCheckResult = {
+        isHealthy: false,
+        status: 'error',
+        lastCheck: new Date(),
+        message: error instanceof Error ? error.message : 'Erro desconhecido',
+        instanceName,
+        apiUrl,
+      };
+
+      this.lastHealthStatus.set(instanceName, result);
+      this.handleUnhealthyStatus(result);
+      await this.logHealthCheck(result);
+    }
+  }
+
+  /**
+   * Lidar com status não-saudável
+   */
+  private async handleUnhealthyStatus(result: HealthCheckResult) {
+    const instanceName = result.instanceName;
+    const failureCount = (this.failureCount.get(instanceName) || 0) + 1;
+    this.failureCount.set(instanceName, failureCount);
+
+    console.warn(
+      `[EvolutionHealthCheck] ⚠️ Instância ${instanceName} não está saudável (falha #${failureCount})`
+    );
+
+    // Alertar após 2 falhas consecutivas
+    if (failureCount === 2) {
+      await notifyOwner({
+        title: '⚠️ Evolution API - Instância Desconectada',
+        content: `A instância ${instanceName} está desconectada.\n\nÚltima verificação: ${result.lastCheck.toLocaleString()}\n\nMensagens não estão sendo enviadas!`,
+      });
+    }
+
+    // Alerta crítico após 3 falhas
+    if (failureCount >= 3) {
+      await notifyOwner({
+        title: '🚨 CRÍTICO: Evolution API - Instância Offline',
+        content: `A instância ${instanceName} está OFFLINE há ${failureCount} verificações consecutivas.\n\nAÇÃO IMEDIATA NECESSÁRIA:\n1. Acessar Evolution Manager\n2. Conectar WhatsApp novamente\n3. Verificar API Key\n\nMensagens estão sendo bloqueadas!`,
+      });
+    }
+  }
+
+  /**
+   * Registrar verificação de saúde em log
+   */
+  private async logHealthCheck(result: HealthCheckResult) {
+    try {
+      // Aqui você pode salvar em banco de dados ou arquivo de log
+      console.log(
+        `[EvolutionHealthCheck] ${result.isHealthy ? '✅' : '❌'} ${result.instanceName}: ${result.message}`
+      );
+    } catch (error) {
+      console.error('[EvolutionHealthCheck] Erro ao registrar log:', error);
+    }
+  }
+
+  /**
+   * Validar antes de enviar mensagem
+   */
+  async validateBeforeSending(): Promise<boolean> {
+    const instanceName = process.env.EVOLUTION_INSTANCE_NAME || 'unknown';
+    const lastStatus = this.lastHealthStatus.get(instanceName);
+
+    if (!lastStatus) {
+      console.warn('[EvolutionHealthCheck] Nenhuma verificação anterior. Executando agora...');
+      await this.performHealthCheck();
+      return this.lastHealthStatus.get(instanceName)?.isHealthy || false;
+    }
+
+    // Se última verificação foi há mais de 1 minuto, fazer nova verificação
+    const timeSinceLastCheck = Date.now() - lastStatus.lastCheck.getTime();
+    if (timeSinceLastCheck > 60 * 1000) {
+      console.log('[EvolutionHealthCheck] Verificação expirada. Executando nova verificação...');
+      await this.performHealthCheck();
+    }
+
+    const isHealthy = this.lastHealthStatus.get(instanceName)?.isHealthy || false;
+
+    if (!isHealthy) {
+      console.error('[EvolutionHealthCheck] ❌ Instância não está saudável. Bloqueando envio.');
+    }
+
+    return isHealthy;
+  }
+
+  /**
+   * Obter status atual
+   */
+  getStatus(): HealthCheckResult | null {
+    const instanceName = process.env.EVOLUTION_INSTANCE_NAME || 'unknown';
+    return this.lastHealthStatus.get(instanceName) || null;
+  }
+
+  /**
+   * Enviar com retry automático
+   */
+  async sendWithRetry(
+    phone: string,
+    message: string,
+    retryCount = 0
+  ): Promise<MessageSendResult> {
+    const instanceName = process.env.EVOLUTION_INSTANCE_NAME || 'unknown';
+    const apiUrl = process.env.EVOLUTION_API_URL || '';
+    const apiKey = process.env.EVOLUTION_API_KEY || '';
+
+    // Validar antes de enviar
+    const isHealthy = await this.validateBeforeSending();
+    if (!isHealthy) {
+      return {
+        success: false,
+        error: 'Instância Evolution não está saudável',
+        retryCount,
+        timestamp: new Date(),
+      };
+    }
+
+    try {
+      const response = await fetch(`${apiUrl}/message/sendText/${instanceName}`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          number: phone,
+          textMessage: message,
+        }),
+      });
+
+      if (response.status === 200 || response.status === 201) {
+        console.log(`[EvolutionHealthCheck] ✅ Mensagem enviada para ${phone}`);
+        return {
+          success: true,
+          retryCount,
+          timestamp: new Date(),
+        };
+      }
+
+      // Se falhou, tentar retry
+      if (retryCount < this.maxRetries) {
+        console.warn(
+          `[EvolutionHealthCheck] ⚠️ Falha ao enviar (${response.status}). Tentando novamente em ${this.retryDelayMs}ms...`
+        );
+
+        await new Promise((resolve) => setTimeout(resolve, this.retryDelayMs));
+        return this.sendWithRetry(phone, message, retryCount + 1);
+      }
+
+      return {
+        success: false,
+        error: `Falha após ${this.maxRetries} tentativas. Status: ${response.status}`,
+        retryCount,
+        timestamp: new Date(),
+      };
+    } catch (error) {
+      if (retryCount < this.maxRetries) {
+        console.warn(
+          `[EvolutionHealthCheck] ⚠️ Erro ao enviar: ${error instanceof Error ? error.message : 'desconhecido'}. Tentando novamente...`
+        );
+
+        await new Promise((resolve) => setTimeout(resolve, this.retryDelayMs));
+        return this.sendWithRetry(phone, message, retryCount + 1);
+      }
+
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Erro desconhecido',
+        retryCount,
+        timestamp: new Date(),
+      };
+    }
+  }
+}
+
+export const evolutionHealthCheck = new EvolutionHealthCheckService();

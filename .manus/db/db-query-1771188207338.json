@@ -1,0 +1,24 @@
+{
+  "query": "ALTER TABLE users \nADD COLUMN password_hash VARCHAR(255) NULL,\nADD COLUMN account_status ENUM('pending', 'approved', 'rejected', 'suspended') NOT NULL DEFAULT 'pending',\nADD COLUMN approved_by INT NULL,\nADD COLUMN approved_at TIMESTAMP NULL,\nADD COLUMN rejected_at TIMESTAMP NULL,\nADD COLUMN suspended_at TIMESTAMP NULL;\n\nUPDATE users SET account_status = 'approved' WHERE openId = 'admin001';\n\nSELECT id, openId, email, role, account_status FROM users;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3dy73aS7obdDVgV.73116cb9d21b --database Xh2xRagQAoY5NjF5TC3DfV --execute ALTER TABLE users \nADD COLUMN password_hash VARCHAR(255) NULL,\nADD COLUMN account_status ENUM('pending', 'approved', 'rejected', 'suspended') NOT NULL DEFAULT 'pending',\nADD COLUMN approved_by INT NULL,\nADD COLUMN approved_at TIMESTAMP NULL,\nADD COLUMN rejected_at TIMESTAMP NULL,\nADD COLUMN suspended_at TIMESTAMP NULL;\n\nUPDATE users SET account_status = 'approved' WHERE openId = 'admin001';\n\nSELECT id, openId, email, role, account_status FROM users;",
+  "rows": [
+    {
+      "id": "1",
+      "openId": "EzahFdyBckHbDxciwCJsaK",
+      "email": "sidneichin@gmail.com",
+      "role": "admin",
+      "account_status": "pending"
+    },
+    {
+      "id": "30009",
+      "openId": "admin001",
+      "email": "admin@odontochin.com",
+      "role": "admin",
+      "account_status": "approved"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\topenId\temail\trole\taccount_status\n1\tEzahFdyBckHbDxciwCJsaK\tsidneichin@gmail.com\tadmin\tpending\n30009\tadmin001\tadmin@odontochin.com\tadmin\tapproved\n",
+  "stderr": "",
+  "execution_time_ms": 1887
+}

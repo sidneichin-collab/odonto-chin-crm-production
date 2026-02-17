@@ -1,0 +1,9 @@
+{
+  "query": "CREATE TABLE IF NOT EXISTS api_error_logs (\n  id BIGINT AUTO_INCREMENT PRIMARY KEY,\n  endpoint VARCHAR(255) NOT NULL,\n  method VARCHAR(10) NOT NULL,\n  error_message TEXT NOT NULL,\n  stack_trace TEXT,\n  user_id INT,\n  severity ENUM('critical', 'error', 'warning', 'info') DEFAULT 'error' NOT NULL,\n  status_code INT,\n  request_body TEXT,\n  response_body TEXT,\n  user_agent VARCHAR(500),\n  ip_address VARCHAR(45),\n  notified TINYINT DEFAULT 0 NOT NULL,\n  notified_at TIMESTAMP NULL,\n  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,\n  INDEX idx_severity (severity),\n  INDEX idx_endpoint (endpoint),\n  INDEX idx_created_at (created_at),\n  INDEX idx_user_id (user_id),\n  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL\n);",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3dy73aS7obdDVgV.73116cb9d21b --database Xh2xRagQAoY5NjF5TC3DfV --execute CREATE TABLE IF NOT EXISTS api_error_logs (\n  id BIGINT AUTO_INCREMENT PRIMARY KEY,\n  endpoint VARCHAR(255) NOT NULL,\n  method VARCHAR(10) NOT NULL,\n  error_message TEXT NOT NULL,\n  stack_trace TEXT,\n  user_id INT,\n  severity ENUM('critical', 'error', 'warning', 'info') DEFAULT 'error' NOT NULL,\n  status_code INT,\n  request_body TEXT,\n  response_body TEXT,\n  user_agent VARCHAR(500),\n  ip_address VARCHAR(45),\n  notified TINYINT DEFAULT 0 NOT NULL,\n  notified_at TIMESTAMP NULL,\n  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,\n  INDEX idx_severity (severity),\n  INDEX idx_endpoint (endpoint),\n  INDEX idx_created_at (created_at),\n  INDEX idx_user_id (user_id),\n  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL\n);",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 626
+}

@@ -1,0 +1,8 @@
+{
+  "query": "ALTER TABLE appointments \nADD COLUMN patient_name VARCHAR(255) AFTER patient_id,\nADD COLUMN patient_phone VARCHAR(50) AFTER patient_name,\nADD COLUMN appointment_type VARCHAR(100) AFTER appointment_time;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3dy73aS7obdDVgV.73116cb9d21b --database Xh2xRagQAoY5NjF5TC3DfV --execute ALTER TABLE appointments \nADD COLUMN patient_name VARCHAR(255) AFTER patient_id,\nADD COLUMN patient_phone VARCHAR(50) AFTER patient_name,\nADD COLUMN appointment_type VARCHAR(100) AFTER appointment_time;",
+  "returncode": 1,
+  "logs": [
+    "ERROR 1054 (42S22) at line 1: Unknown column 'patient_name' in 'appointments'"
+  ]
+}

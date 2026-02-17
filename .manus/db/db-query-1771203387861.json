@@ -1,0 +1,18 @@
+{
+  "query": "SHOW COLUMNS FROM patients LIKE 'treatment_type';",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3dy73aS7obdDVgV.73116cb9d21b --database Xh2xRagQAoY5NjF5TC3DfV --execute SHOW COLUMNS FROM patients LIKE 'treatment_type';",
+  "rows": [
+    {
+      "Field": "treatment_type",
+      "Type": "enum('orthodontics','general_clinic','both')",
+      "Null": "NO",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    }
+  ],
+  "messages": [],
+  "stdout": "Field\tType\tNull\tKey\tDefault\tExtra\ntreatment_type\tenum('orthodontics','general_clinic','both')\tNO\t\tNULL\t\n",
+  "stderr": "",
+  "execution_time_ms": 51
+}

@@ -1,0 +1,9 @@
+{
+  "query": "ALTER TABLE patients ADD COLUMN cedula_image_url TEXT AFTER ubicacion;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3dy73aS7obdDVgV.73116cb9d21b --database Xh2xRagQAoY5NjF5TC3DfV --execute ALTER TABLE patients ADD COLUMN cedula_image_url TEXT AFTER ubicacion;",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 477
+}

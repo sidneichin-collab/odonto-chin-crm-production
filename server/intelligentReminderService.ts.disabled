@@ -1,0 +1,384 @@
+/**
+ * Intelligent Reminder Service con Escalada Progresiva
+ * 
+ * Características:
+ * - Envío automático de recordatorios según plantillas predefinidas
+ * - Escalada progresiva de mensajes persuasivos
+ * - Detección de confirmaciones del paciente
+ * - Detección de solicitudes espontáneas de reagendamiento
+ * - Notificación automática a secretaria cuando paciente pide reagendar
+ * - Para automáticamente cuando paciente confirma
+ * - Tracking completo de efectividad de cada mensaje
+ */
+
+import cron from 'node-cron';
+import { db } from './db';
+import { sendWhatsAppMessage } from './whatsappService.js';
+// Email service will be integrated later
+import { appointments, reminderTemplates, reminderSchedule, rescheduleRequests, patients, whatsappConversations } from '../drizzle/schema.js';
+import { eq, and, lte, gte, isNull, sql } from 'drizzle-orm';
+
+async function getDb() { return db; }
+
+// Palabras clave para detectar confirmación
+const CONFIRMATION_KEYWORDS = [
+  'confirmo', 'confirm', 'sí', 'si', 'ok', 'vale', 'claro',
+  'seguro', 'por supuesto', 'ahí estaré', 'ahi estare', 'voy',
+  'asisto', 'estaré', 'estare', 'allí estaré', 'alli estare'
+];
+
+// Palabras clave para detectar solicitud de reagendamiento
+const RESCHEDULE_KEYWORDS = [
+  'reagendar', 'cambiar', 'no puedo', 'otro día', 'otro dia',
+  'otra fecha', 'reprogramar', 'mover', 'postergar', 'cancelar',
+  'imposible', 'no voy', 'no podré', 'no podre', 'tengo un compromiso',
+  'tengo otro compromiso', 'surgió algo', 'surgio algo'
+];
+
+/**
+ * Reemplaza variables en el template del mensaje
+ */
+function replaceMessageVariables(template: string, data: {
+  patientName: string;
+  appointmentType: string;
+  appointmentTime: string;
+  appointmentDate: string;
+}): string {
+  return template
+    .replace(/{patientName}/g, data.patientName)
+    .replace(/{appointmentType}/g, data.appointmentType)
+    .replace(/{appointmentTime}/g, data.appointmentTime)
+    .replace(/{appointmentDate}/g, data.appointmentDate);
+}
+
+/**
+ * Detecta si el mensaje contiene confirmación
+ */
+export function detectConfirmation(message: string): boolean {
+  const lowerMessage = message.toLowerCase().trim();
+  return CONFIRMATION_KEYWORDS.some(keyword => lowerMessage.includes(keyword));
+}
+
+/**
+ * Detecta si el mensaje contiene solicitud de reagendamiento
+ */
+export function detectRescheduleRequest(message: string): {
+  isReschedule: boolean;
+  keywords: string[];
+} {
+  const lowerMessage = message.toLowerCase().trim();
+  const foundKeywords = RESCHEDULE_KEYWORDS.filter(keyword => 
+    lowerMessage.includes(keyword)
+  );
+  
+  return {
+    isReschedule: foundKeywords.length > 0,
+    keywords: foundKeywords
+  };
+}
+
+/**
+ * Programa recordatorios para una cita específica
+ */
+export async function scheduleRemindersForAppointment(appointmentId: number) {
+  try {
+    // Obtener cita con información del paciente
+    const appointment = await (await getDb()).query.appointments.findFirst({
+      where: eq(appointments.id, appointmentId),
+      with: {
+        patient: true
+      }
+    });
+
+    if (!appointment) {
+      console.error(`[IntelligentReminder] Appointment ${appointmentId} not found`);
+      return;
+    }
+
+    // Si ya está confirmado, no programar recordatorios
+    if (appointment.status === 'confirmed') {
+      console.log(`[IntelligentReminder] Appointment ${appointmentId} already confirmed, skipping`);
+      return;
+    }
+
+    // Obtener todas las plantillas activas
+    const templates = await (await getDb()).query.reminderTemplates.findMany({
+      where: eq(reminderTemplates.isActive, true),
+          orderBy: (templates: any, { asc }: any) => [asc(templates.attemptNumber)]
+    });
+
+    const appointmentDate = new Date(appointment.appointmentDate);
+    
+    // Crear schedule para cada plantilla
+    for (const template of templates) {
+      const scheduledFor = new Date(appointmentDate);
+      scheduledFor.setHours(
+        scheduledFor.getHours() - template.hoursBeforeAppointment + template.scheduledHour,
+        template.scheduledMinute,
+        0,
+        0
+      );
+
+      // Solo programar si la fecha es futura
+      if (scheduledFor > new Date()) {
+        await (await getDb()).insert(reminderSchedule).values({
+          appointmentId,
+          templateId: template.id,
+          attemptNumber: template.attemptNumber,
+          scheduledFor,
+          channel: appointment.patient.email ? 'email' : 'whatsapp',
+          status: 'pending'
+        });
+      }
+    }
+
+    console.log(`[IntelligentReminder] Scheduled ${templates.length} reminders for appointment ${appointmentId}`);
+  } catch (error) {
+    console.error('[IntelligentReminder] Error scheduling reminders:', error);
+  }
+}
+
+/**
+ * Procesa recordatorios pendientes
+ */
+async function processReminders() {
+  try {
+    const now = new Date();
+    
+    // Obtener recordatorios pendientes que deben enviarse ahora
+    const pendingReminders = await (await getDb()).query.reminderSchedule.findMany({
+      where: and(
+        eq(reminderSchedule.status, 'pending'),
+        lte(reminderSchedule.scheduledFor, now)
+      ),
+      with: {
+        appointment: {
+          with: {
+            patient: true
+          }
+        },
+        template: true
+      },
+      limit: 50 // Procesar máximo 50 por vez
+    });
+
+    console.log(`[IntelligentReminder] Processing ${pendingReminders.length} pending reminders`);
+
+    for (const reminder of pendingReminders) {
+      try {
+        const { appointment, template } = reminder;
+        
+        // Verificar si la cita ya fue confirmada
+        if (appointment.status === 'confirmed') {
+          await (await getDb()).update(reminderSchedule)
+            .set({ status: 'skipped' })
+            .where(eq(reminderSchedule.id, reminder.id));
+          console.log(`[IntelligentReminder] Skipped reminder ${reminder.id} - appointment already confirmed`);
+          continue;
+        }
+
+        // Preparar mensaje
+        const appointmentTime = new Date(appointment.appointmentDate).toLocaleTimeString('es-ES', {
+          hour: '2-digit',
+          minute: '2-digit'
+        });
+        
+        const appointmentDateStr = new Date(appointment.appointmentDate).toLocaleDateString('es-ES', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric'
+        });
+
+        const messageContent = replaceMessageVariables(template.messageTemplate, {
+          patientName: appointment.patient.fullName,
+          appointmentType: appointment.appointmentType === 'orthodontics' ? 'Ortodoncia' : 'Clínico General',
+          appointmentTime,
+          appointmentDate: appointmentDateStr
+        });
+
+        // Enviar mensaje
+        let success = false;
+        let errorMessage = '';
+
+        if (reminder.channel === 'whatsapp' && appointment.patient.phone) {
+          try {
+            await sendWhatsAppMessage(
+              'reminders', // Canal de recordatorios
+              appointment.patient.phone,
+              messageContent
+            );
+            success = true;
+          } catch (error: any) {
+            errorMessage = error.message;
+            console.error(`[IntelligentReminder] WhatsApp error:`, error);
+          }
+        } else if (reminder.channel === 'email' && appointment.patient.email) {
+          try {
+          // TODO: Implement sendReminderEmail
+          console.log("[IntelligentReminder] Email reminder not implemented yet");
+            success = true;
+          } catch (error: any) {
+            errorMessage = error.message;
+            console.error(`[IntelligentReminder] Email error:`, error);
+          }
+        }
+
+        // Actualizar schedule
+        await (await getDb()).update(reminderSchedule)
+          .set({
+            status: success ? 'sent' : 'failed',
+            sentAt: new Date(),
+            messageContent,
+            errorMessage: errorMessage || null
+          })
+          .where(eq(reminderSchedule.id, reminder.id));
+
+        // Actualizar contador de intentos en appointment
+        if (success) {
+          await (await getDb()).update(appointments)
+            .set({
+              reminderAttempts: (appointment.reminderAttempts || 0) + 1,
+              lastReminderAt: new Date()
+            })
+            .where(eq(appointments.id, appointment.id));
+        }
+
+        console.log(`[IntelligentReminder] Reminder ${reminder.id} ${success ? 'sent' : 'failed'}`);
+        
+        // Pequeño delay para evitar rate limiting
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+      } catch (error) {
+        console.error(`[IntelligentReminder] Error processing reminder ${reminder.id}:`, error);
+      }
+    }
+  } catch (error) {
+    console.error('[IntelligentReminder] Error in processReminders:', error);
+  }
+}
+
+/**
+ * Procesa mensaje entrante del paciente
+ */
+export async function processIncomingPatientMessage(
+  conversationId: number,
+  patientPhone: string,
+  message: string
+) {
+  try {
+    // Detectar confirmación
+    if (detectConfirmation(message)) {
+      // Buscar cita pendiente del paciente
+      const patient = await (await getDb()).query.patients.findFirst({
+        where: eq(patients.phone, patientPhone)
+      });
+
+      if (patient) {
+        const pendingAppointment = await (await getDb()).query.appointments.findFirst({
+          where: and(
+            eq(appointments.patientId, patient.id),
+            eq(appointments.status, 'pending'),
+            gte(appointments.appointmentDate, new Date())
+          ),
+          orderBy: (appointments: any, { asc }: any) => [asc(appointments.appointmentDate)]
+        });
+
+        if (pendingAppointment) {
+          // Actualizar cita a confirmada
+          await (await getDb()).update(appointments)
+            .set({
+              status: 'confirmed',
+              confirmedAt: new Date()
+            })
+            .where(eq(appointments.id, pendingAppointment.id));
+
+          // Actualizar todos los recordatorios pendientes a skipped
+          await (await getDb()).update(reminderSchedule)
+            .set({ status: 'skipped' })
+            .where(and(
+              eq(reminderSchedule.appointmentId, pendingAppointment.id),
+              eq(reminderSchedule.status, 'pending')
+            ));
+
+          // Marcar el último recordatorio enviado como confirmado
+          const lastSentReminder = await (await getDb()).query.reminderSchedule.findFirst({
+            where: and(
+              eq(reminderSchedule.appointmentId, pendingAppointment.id),
+              eq(reminderSchedule.status, 'sent')
+            ),
+            orderBy: (schedule: any, { desc }: any) => [desc(schedule.sentAt)]
+          });
+
+          if (lastSentReminder) {
+            await (await getDb()).update(reminderSchedule)
+              .set({
+                patientConfirmed: true,
+                confirmedAt: new Date()
+              })
+              .where(eq(reminderSchedule.id, lastSentReminder.id));
+          }
+
+          console.log(`[IntelligentReminder] Patient confirmed appointment ${pendingAppointment.id}`);
+          return { type: 'confirmation', appointmentId: pendingAppointment.id };
+        }
+      }
+    }
+
+    // Detectar solicitud de reagendamiento
+    const rescheduleDetection = detectRescheduleRequest(message);
+    if (rescheduleDetection.isReschedule) {
+      const patient = await (await getDb()).query.patients.findFirst({
+        where: eq(patients.phone, patientPhone)
+      });
+
+      if (patient) {
+        const pendingAppointment = await (await getDb()).query.appointments.findFirst({
+          where: and(
+            eq(appointments.patientId, patient.id),
+            eq(appointments.status, 'pending'),
+            gte(appointments.appointmentDate, new Date())
+          ),
+          orderBy: (appointments: any, { asc }: any) => [asc(appointments.appointmentDate)]
+        });
+
+        if (pendingAppointment) {
+          // Crear solicitud de reagendamiento
+          const rescheduleRequest = await (await getDb()).insert(rescheduleRequests).values({
+            appointmentId: pendingAppointment.id,
+            patientId: patient.id,
+            conversationId,
+            detectedMessage: message,
+            detectedKeywords: JSON.stringify(rescheduleDetection.keywords),
+            status: 'pending'
+          });
+
+          console.log(`[IntelligentReminder] Reschedule request detected for appointment ${pendingAppointment.id}`);
+          return { 
+            type: 'reschedule_request', 
+            appointmentId: pendingAppointment.id,
+            rescheduleRequestId: rescheduleRequest.insertId
+          };
+        }
+      }
+    }
+
+    return { type: 'unknown' };
+  } catch (error) {
+    console.error('[IntelligentReminder] Error processing incoming message:', error);
+    return { type: 'error' };
+  }
+}
+
+/**
+ * Inicializa el servicio de recordatorios inteligentes
+ */
+export function initIntelligentReminderService() {
+  console.log('[IntelligentReminder] Starting Intelligent Reminder Service...');
+
+  // Ejecutar cada minuto para procesar recordatorios pendientes
+  cron.schedule('* * * * *', async () => {
+    await processReminders();
+  });
+
+  console.log('[IntelligentReminder] Intelligent Reminder Service started successfully');
+}

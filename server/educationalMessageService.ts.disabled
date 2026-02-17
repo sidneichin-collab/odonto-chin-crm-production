@@ -1,0 +1,342 @@
+/**
+ * Educational Message Service
+ * 
+ * Envia mensagens educacionais sobre ortodoncia no dia seguinte à confirmação às 15h
+ * Usa templates avançados com persuasão e conteúdo educacional
+ */
+
+import { getDb } from "./db";
+import { appointments, reminderSchedule, patients } from "../drizzle/schema";
+import { eq, and, lte } from "drizzle-orm";
+import { sendTestMessageViaEvolution } from "./testEvolutionApi";
+import {
+  advancedTemplates,
+  formatAdvancedMessage,
+  getTemplatesByTrigger,
+} from "./advancedReminderTemplates";
+
+/**
+ * Send educational message for confirmed appointments
+ * Triggered 1 day after confirmation at 15:00
+ */
+export async function sendEducationalMessage(appointmentId: number): Promise<{
+  success: boolean;
+  message: string;
+  messageId?: string;
+}> {
+  const db = await getDb();
+  if (!db) {
+    return { success: false, message: "Database connection failed" };
+  }
+
+  try {
+    console.log(
+      `[EducationalMessage] Sending educational message for appointment ${appointmentId}`
+    );
+
+    // Get appointment details
+    const appointment = await db
+      .select()
+      .from(appointments)
+      .where(eq(appointments.id, appointmentId))
+      .limit(1);
+
+    if (!appointment || appointment.length === 0) {
+      return { success: false, message: "Appointment not found" };
+    }
+
+    const apt = appointment[0];
+
+    // Get patient details
+    const patient = await db
+      .select()
+      .from(patients)
+      .where(eq(patients.id, apt.patientId))
+      .limit(1);
+
+    if (!patient || patient.length === 0) {
+      return { success: false, message: "Patient not found" };
+    }
+
+    const pat = patient[0];
+
+    // Select educational template
+    const educationalTemplate =
+      advancedTemplates["post_confirmation_educational_brackets"];
+
+    if (!educationalTemplate) {
+      return { success: false, message: "Educational template not found" };
+    }
+
+    // Format message with patient data
+    const formattedMessage = formatAdvancedMessage(educationalTemplate, {
+      patientName: pat.fullName,
+      doctorName: "Dra",
+      appointmentDate: apt.appointmentDate.toLocaleDateString("es-ES"),
+      appointmentTime: "14:00",
+    });
+
+    console.log(`[EducationalMessage] Formatted message for ${pat.fullName}:`);
+    console.log(formattedMessage);
+
+    // Send message via Evolution API
+    const result = await sendTestMessageViaEvolution(
+      "test-connection",
+      pat.phone,
+      formattedMessage,
+      "whatsapp"
+    );
+
+    if (!result.success) {
+      // Log failed attempt
+      await db.insert(reminderSchedule).values({
+        appointmentId: appointmentId,
+        templateId: 1,
+        attemptNumber: 0,
+        scheduledFor: new Date(),
+        sentAt: new Date(),
+        channel: "whatsapp",
+        status: "failed",
+        messageContent: formattedMessage,
+        errorMessage: result.message || "Unknown error",
+        createdAt: new Date(),
+      });
+
+      return {
+        success: false,
+        message: `Failed to send message: ${result.message}`,
+      };
+    }
+
+    // Log successful send
+    await db.insert(reminderSchedule).values({
+      appointmentId: appointmentId,
+      templateId: 1,
+      attemptNumber: 0,
+      scheduledFor: new Date(),
+      sentAt: new Date(),
+      channel: "whatsapp",
+      status: "sent",
+      messageContent: formattedMessage,
+      createdAt: new Date(),
+    });
+
+    console.log(
+      `[EducationalMessage] ✅ Educational message sent to ${pat.phone}`
+    );
+
+    return {
+      success: true,
+      message: "Educational message sent successfully",
+      messageId: result.success ? "sent" : undefined,
+    };
+  } catch (error) {
+    console.error("[EducationalMessage] Error sending educational message:", error);
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "Unknown error",
+    };
+  }
+}
+
+/**
+ * Process all pending educational messages scheduled for now
+ */
+export async function processPendingEducationalMessages(): Promise<{
+  processed: number;
+  successful: number;
+  failed: number;
+}> {
+  const db = await getDb();
+  if (!db) {
+    return { processed: 0, successful: 0, failed: 0 };
+  }
+
+  try {
+    console.log("[EducationalMessage] Processing pending educational messages");
+
+    const now = new Date();
+
+    // Find all pending educational reminders scheduled for now or earlier
+    const pendingReminders = await db
+      .select()
+      .from(reminderSchedule)
+      .where(
+        and(
+          eq(reminderSchedule.status, "pending"),
+          lte(reminderSchedule.scheduledFor, now),
+          eq(reminderSchedule.channel, "whatsapp")
+        )
+      );
+
+    console.log(
+      `[EducationalMessage] Found ${pendingReminders.length} pending reminders`
+    );
+
+    let successful = 0;
+    let failed = 0;
+
+    for (const reminder of pendingReminders) {
+      const result = await sendEducationalMessage(reminder.appointmentId);
+
+      if (result.success) {
+        successful++;
+      } else {
+        failed++;
+      }
+    }
+
+    console.log(
+      `[EducationalMessage] ✅ Processed ${pendingReminders.length} reminders (${successful} successful, ${failed} failed)`
+    );
+
+    return {
+      processed: pendingReminders.length,
+      successful,
+      failed,
+    };
+  } catch (error) {
+    console.error("[EducationalMessage] Error processing pending messages:", error);
+    return { processed: 0, successful: 0, failed: 0 };
+  }
+}
+
+/**
+ * Get statistics on educational messages sent
+ */
+export async function getEducationalMessageStatistics(): Promise<{
+  totalSent: number;
+  totalFailed: number;
+  successRate: number;
+  averageResponseTime?: number;
+}> {
+  const db = await getDb();
+  if (!db) {
+    return { totalSent: 0, totalFailed: 0, successRate: 0 };
+  }
+
+  try {
+    // Get all educational message reminders
+    const sentMessages = await db
+      .select()
+      .from(reminderSchedule)
+      .where(eq(reminderSchedule.status, "sent"));
+
+    const failedMessages = await db
+      .select()
+      .from(reminderSchedule)
+      .where(eq(reminderSchedule.status, "failed"));
+
+    const total = sentMessages.length + failedMessages.length;
+    const successRate = total > 0 ? Math.round((sentMessages.length / total) * 100) : 0;
+
+    return {
+      totalSent: sentMessages.length,
+      totalFailed: failedMessages.length,
+      successRate,
+    };
+  } catch (error) {
+    console.error("[EducationalMessage] Error getting statistics:", error);
+    return { totalSent: 0, totalFailed: 0, successRate: 0 };
+  }
+}
+
+/**
+ * Retry failed educational messages
+ */
+export async function retryFailedEducationalMessages(): Promise<{
+  retried: number;
+  successful: number;
+  failed: number;
+}> {
+  const db = await getDb();
+  if (!db) {
+    return { retried: 0, successful: 0, failed: 0 };
+  }
+
+  try {
+    console.log("[EducationalMessage] Retrying failed educational messages");
+
+    // Get failed reminders from the last 24 hours
+    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+    const failedReminders = await db
+      .select()
+      .from(reminderSchedule)
+      .where(eq(reminderSchedule.status, "failed"));
+
+    console.log(
+      `[EducationalMessage] Found ${failedReminders.length} failed reminders to retry`
+    );
+
+    // Filter reminders from last 24 hours
+    const recentFailedReminders = failedReminders.filter(
+      (r) => r.createdAt && new Date(r.createdAt).getTime() > twentyFourHoursAgo.getTime()
+    );
+
+    let successful = 0;
+    let failed = 0;
+
+    for (const reminder of recentFailedReminders) {
+      const result = await sendEducationalMessage(reminder.appointmentId);
+
+      if (result.success) {
+        successful++;
+      } else {
+        failed++;
+      }
+    }
+
+    console.log(
+      `[EducationalMessage] ✅ Retried ${failedReminders.length} reminders (${successful} successful, ${failed} failed)`
+    );
+
+    return {
+      retried: failedReminders.length,
+      successful,
+      failed,
+    };
+  } catch (error) {
+    console.error("[EducationalMessage] Error retrying failed messages:", error);
+    return { retried: 0, successful: 0, failed: 0 };
+  }
+}
+
+/**
+ * Schedule educational message for a specific appointment
+ */
+export async function scheduleEducationalMessage(
+  appointmentId: number,
+  sendTime: Date = new Date(Date.now() + 24 * 60 * 60 * 1000) // Default: tomorrow
+): Promise<boolean> {
+  const db = await getDb();
+  if (!db) return false;
+
+  try {
+    console.log(
+      `[EducationalMessage] Scheduling educational message for appointment ${appointmentId} at ${sendTime.toISOString()}`
+    );
+
+    // Set time to 15:00
+    sendTime.setHours(15, 0, 0, 0);
+
+    await db.insert(reminderSchedule).values({
+      appointmentId: appointmentId,
+      templateId: 1,
+      attemptNumber: 0,
+      scheduledFor: sendTime,
+      channel: "whatsapp",
+      status: "pending",
+      messageContent: "Educational message about brackets (pending)",
+      createdAt: new Date(),
+    });
+
+    console.log(
+      `[EducationalMessage] ✅ Educational message scheduled for ${sendTime.toISOString()}`
+    );
+    return true;
+  } catch (error) {
+    console.error("[EducationalMessage] Error scheduling educational message:", error);
+    return false;
+  }
+}

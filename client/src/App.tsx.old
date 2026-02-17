@@ -1,0 +1,59 @@
+import { Toaster } from "@/components/ui/sonner";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import NotFound from "@/pages/NotFound";
+import { Route, Switch } from "wouter";
+import ErrorBoundary from "./components/ErrorBoundary";
+import { ThemeProvider } from "./contexts/ThemeContext";
+import Home from "./pages/Home";
+import Pacientes from "./pages/Pacientes";
+import PatientDetails from "./pages/PatientDetails";
+import Agendamentos from "./pages/Agendamentos";
+import Kanban from "./pages/Kanban";
+import Alertas from "./pages/Alertas";
+import CitasHoy from "./pages/CitasHoy";
+import ConfirmadasHoy from "./pages/ConfirmadasHoy";
+import PendientesHoy from "./pages/PendientesHoy";
+import CompletadasHoy from "./pages/CompletadasHoy";
+import ConfirmadasManana from "./pages/ConfirmadasManana";
+import PendientesManana from "./pages/PendientesManana";
+import CanceladasManana from "./pages/CanceladasManana";
+import Campanhas from "./pages/Campanhas";
+
+function Router() {
+  return (
+    <Switch>
+      <Route path={"/"} component={Home} />
+      <Route path={"/pacientes"} component={Pacientes} />
+      <Route path={"/pacientes/:id"} component={PatientDetails} />
+      <Route path={"/agendamentos"} component={Agendamentos} />
+      <Route path={"/kanban"} component={Kanban} />
+      <Route path={"/alertas"} component={Alertas} />
+      <Route path={"/citas-hoy"} component={CitasHoy} />
+      <Route path={"/confirmadas-hoy"} component={ConfirmadasHoy} />
+      <Route path={"/pendientes-hoy"} component={PendientesHoy} />
+      <Route path={"/completadas-hoy"} component={CompletadasHoy} />
+      <Route path={"/confirmadas-manana"} component={ConfirmadasManana} />
+      <Route path={"/pendientes-manana"} component={PendientesManana} />
+      <Route path={"/canceladas-manana"} component={CanceladasManana} />
+      <Route path={"/campanhas"} component={Campanhas} />
+      <Route path={"/404"} component={NotFound} />
+      {/* Final fallback route */}
+      <Route component={NotFound} />
+    </Switch>
+  );
+}
+
+function App() {
+  return (
+    <ErrorBoundary>
+      <ThemeProvider defaultTheme="dark" switchable={true}>
+        <TooltipProvider>
+          <Toaster />
+          <Router />
+        </TooltipProvider>
+      </ThemeProvider>
+    </ErrorBoundary>
+  );
+}
+
+export default App;

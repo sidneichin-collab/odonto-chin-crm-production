@@ -1,0 +1,247 @@
+import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, boolean, datetime } from "drizzle-orm/mysql-core";
+
+/**
+ * ODONTO CHIN CRM - Database Schema
+ * Sistema completo para gestão de clínicas odontológicas
+ */
+
+// ============================================================================
+// USERS (Sistema de Autenticação)
+// ============================================================================
+
+export const users = mysqlTable("users", {
+  id: int("id").autoincrement().primaryKey(),
+  openId: varchar("openId", { length: 64 }).notNull().unique(),
+  name: text("name"),
+  email: varchar("email", { length: 320 }),
+  loginMethod: varchar("loginMethod", { length: 64 }),
+  role: mysqlEnum("role", ["user", "admin"]).default("user").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
+});
+
+export type User = typeof users.$inferSelect;
+export type InsertUser = typeof users.$inferInsert;
+
+// ============================================================================
+// CLINIC SETTINGS (Configurações da Clínica)
+// ============================================================================
+
+export const clinicSettings = mysqlTable("clinic_settings", {
+  id: int("id").autoincrement().primaryKey(),
+  clinicName: varchar("clinic_name", { length: 255 }).notNull(),
+  country: varchar("country", { length: 100 }).notNull().default("Paraguay"),
+  timezone: varchar("timezone", { length: 100 }).notNull().default("America/Asuncion"),
+  logoUrl: text("logo_url"),
+  contactPhone: varchar("contact_phone", { length: 50 }),
+  contactEmail: varchar("contact_email", { length: 320 }),
+  whatsappApiUrl: text("whatsapp_api_url"),
+  whatsappApiKey: text("whatsapp_api_key"),
+  whatsappInstanceName: varchar("whatsapp_instance_name", { length: 255 }),
+  remindersEnabled: boolean("reminders_enabled").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+});
+
+export type ClinicSettings = typeof clinicSettings.$inferSelect;
+export type InsertClinicSettings = typeof clinicSettings.$inferInsert;
+
+// ============================================================================
+// PATIENTS (Pacientes)
+// ============================================================================
+
+export const patients = mysqlTable("patients", {
+  id: int("id").autoincrement().primaryKey(),
+  name: varchar("name", { length: 255 }).notNull(),
+  phone: varchar("phone", { length: 50 }).notNull(), // WhatsApp
+  emergencyContact: varchar("emergency_contact", { length: 255 }), // Contato de emergência (familiar/amigo)
+  email: varchar("email", { length: 320 }),
+  birthDate: datetime("birth_date"),
+  address: text("address"),
+  ubicacion: text("ubicacion"), // Endereço completo/localização
+  cedulaImageUrl: text("cedula_image_url"), // URL da imagem da cédula de identidade
+  treatmentType: mysqlEnum("treatment_type", ["ortodontia", "clinica_geral", "ambos"]).notNull(),
+  origin: varchar("origin", { length: 100 }), // marketing, indicação, etc
+  notes: text("notes"),
+  riskLevel: mysqlEnum("risk_level", ["baixo", "medio", "alto"]).default("baixo"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+});
+
+export type Patient = typeof patients.$inferSelect;
+export type InsertPatient = typeof patients.$inferInsert;
+
+// ============================================================================
+// APPOINTMENTS (Agendamentos/Consultas)
+// ============================================================================
+
+export const appointments = mysqlTable("appointments", {
+  id: int("id").autoincrement().primaryKey(),
+  patientId: int("patient_id").notNull().references(() => patients.id, { onDelete: "cascade" }),
+  appointmentDate: datetime("appointment_date").notNull(),
+  appointmentTime: varchar("appointment_time", { length: 10 }).notNull(), // "14:30"
+  treatmentType: mysqlEnum("treatment_type", ["ortodontia", "clinica_geral", "ambos"]).notNull(),
+  status: mysqlEnum("status", [
+    "agendado",
+    "confirmado",
+    "nao_confirmado",
+    "completado",
+    "cancelado",
+    "reagendamento_pendente"
+  ]).default("agendado").notNull(),
+  chair: int("chair").default(1), // Cadeira específica (1, 2, 3, etc)
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+});
+
+export type Appointment = typeof appointments.$inferSelect;
+export type InsertAppointment = typeof appointments.$inferInsert;
+
+// ============================================================================
+// REMINDERS (Recordatórios Enviados)
+// ============================================================================
+
+export const reminders = mysqlTable("reminders", {
+  id: int("id").autoincrement().primaryKey(),
+  appointmentId: int("appointment_id").notNull().references(() => appointments.id, { onDelete: "cascade" }),
+  patientId: int("patient_id").notNull().references(() => patients.id, { onDelete: "cascade" }),
+  reminderType: mysqlEnum("reminder_type", [
+    "2_dias_antes_10h",
+    "2_dias_antes_15h",
+    "2_dias_antes_19h",
+    "1_dia_antes_7h",
+    "1_dia_antes_8h",
+    "1_dia_antes_10h",
+    "1_dia_antes_12h",
+    "1_dia_antes_14h",
+    "1_dia_antes_16h",
+    "1_dia_antes_18h",
+    "dia_consulta_7h",
+    "dia_consulta_2h_antes",
+    "confirmado_reforco",
+    "confirmado_dia_consulta"
+  ]).notNull(),
+  message: text("message").notNull(),
+  sentAt: timestamp("sent_at").defaultNow().notNull(),
+  deliveryStatus: mysqlEnum("delivery_status", ["enviado", "entregue", "lido", "falhou"]).default("enviado"),
+  whatsappMessageId: varchar("whatsapp_message_id", { length: 255 }),
+});
+
+export type Reminder = typeof reminders.$inferSelect;
+export type InsertReminder = typeof reminders.$inferInsert;
+
+// ============================================================================
+// PATIENT_INTERACTIONS (Interações com Pacientes)
+// ============================================================================
+
+export const patientInteractions = mysqlTable("patient_interactions", {
+  id: int("id").autoincrement().primaryKey(),
+  patientId: int("patient_id").notNull().references(() => patients.id, { onDelete: "cascade" }),
+  appointmentId: int("appointment_id").references(() => appointments.id, { onDelete: "set null" }),
+  interactionType: mysqlEnum("interaction_type", [
+    "confirmacao_sim",
+    "confirmacao_nao",
+    "reagendamento",
+    "cancelamento",
+    "mensagem_recebida",
+    "mensagem_enviada"
+  ]).notNull(),
+  message: text("message"),
+  detectedIntent: varchar("detected_intent", { length: 100 }), // "si", "no", "reagendar", etc
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export type PatientInteraction = typeof patientInteractions.$inferSelect;
+export type InsertPatientInteraction = typeof patientInteractions.$inferInsert;
+
+// ============================================================================
+// RESCHEDULING_REQUESTS (Solicitações de Reagendamento)
+// ============================================================================
+
+export const reschedulingRequests = mysqlTable("rescheduling_requests", {
+  id: int("id").autoincrement().primaryKey(),
+  appointmentId: int("appointment_id").notNull().references(() => appointments.id, { onDelete: "cascade" }),
+  patientId: int("patient_id").notNull().references(() => patients.id, { onDelete: "cascade" }),
+  requestedAt: timestamp("requested_at").defaultNow().notNull(),
+  status: mysqlEnum("status", ["pendente", "contatado", "reagendado", "cancelado"]).default("pendente").notNull(),
+  notes: text("notes"),
+  resolvedAt: timestamp("resolved_at"),
+  resolvedBy: int("resolved_by").references(() => users.id),
+});
+
+export type ReschedulingRequest = typeof reschedulingRequests.$inferSelect;
+export type InsertReschedulingRequest = typeof reschedulingRequests.$inferInsert;
+
+// ============================================================================
+// MESSAGE_TEMPLATES (Templates de Mensagens)
+// ============================================================================
+
+export const messageTemplates = mysqlTable("message_templates", {
+  id: int("id").autoincrement().primaryKey(),
+  templateKey: varchar("template_key", { length: 100 }).notNull().unique(),
+  templateName: varchar("template_name", { length: 255 }).notNull(),
+  message: text("message").notNull(),
+  variables: text("variables"), // JSON com variáveis disponíveis
+  category: mysqlEnum("category", [
+    "recordatorio",
+    "confirmacao",
+    "reagendamento",
+    "cancelamento",
+    "pos_consulta"
+  ]).notNull(),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+});
+
+export type MessageTemplate = typeof messageTemplates.$inferSelect;
+export type InsertMessageTemplate = typeof messageTemplates.$inferInsert;
+
+// ============================================================================
+// ALERTS (Alertas do Sistema)
+// ============================================================================
+
+export const alerts = mysqlTable("alerts", {
+  id: int("id").autoincrement().primaryKey(),
+  alertType: mysqlEnum("alert_type", [
+    "paciente_nao_confirmado",
+    "consulta_proxima",
+    "reagendamento_pendente",
+    "taxa_confirmacao_baixa",
+    "paciente_risco_inadimplencia",
+    "canal_whatsapp_problema"
+  ]).notNull(),
+  severity: mysqlEnum("severity", ["baixa", "media", "alta", "critica"]).default("media").notNull(),
+  title: varchar("title", { length: 255 }).notNull(),
+  message: text("message").notNull(),
+  relatedPatientId: int("related_patient_id").references(() => patients.id, { onDelete: "cascade" }),
+  relatedAppointmentId: int("related_appointment_id").references(() => appointments.id, { onDelete: "cascade" }),
+  isRead: boolean("is_read").default(false).notNull(),
+  isResolved: boolean("is_resolved").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  resolvedAt: timestamp("resolved_at"),
+});
+
+export type Alert = typeof alerts.$inferSelect;
+export type InsertAlert = typeof alerts.$inferInsert;
+
+// ============================================================================
+// WHATSAPP_CHANNEL_HEALTH (Saúde do Canal WhatsApp)
+// ============================================================================
+
+export const whatsappChannelHealth = mysqlTable("whatsapp_channel_health", {
+  id: int("id").autoincrement().primaryKey(),
+  date: datetime("date").notNull(),
+  messagesSent: int("messages_sent").default(0).notNull(),
+  messagesDelivered: int("messages_delivered").default(0).notNull(),
+  messagesFailed: int("messages_failed").default(0).notNull(),
+  deliveryRate: int("delivery_rate").default(100).notNull(), // Percentual
+  healthScore: int("health_score").default(100).notNull(), // 0-100
+  isBlocked: boolean("is_blocked").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export type WhatsappChannelHealth = typeof whatsappChannelHealth.$inferSelect;
+export type InsertWhatsappChannelHealth = typeof whatsappChannelHealth.$inferInsert;

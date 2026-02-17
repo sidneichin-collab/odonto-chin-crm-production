@@ -1,0 +1,487 @@
+import DashboardLayout from "@/components/DashboardLayout";
+import QuickAddPatient from "@/components/QuickAddPatient";
+import DistributionAlertBanner from "@/components/DistributionAlertBanner";
+import DashboardClock from "@/components/DashboardClock";
+
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { trpc } from "@/lib/trpc";
+import { 
+  Calendar, 
+  CheckCircle2, 
+  Clock, 
+  Users,
+  AlertTriangle,
+  X,
+  Phone,
+  ChevronLeft,
+  ChevronRight,
+  Send,
+} from "lucide-react";
+import { format, isSameDay, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isToday, addMonths, subMonths } from "date-fns";
+import { es } from "date-fns/locale";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
+
+type AppointmentDetail = {
+  id: number;
+  patientName: string | null;
+  patientPhone: string | null;
+  appointmentDate: Date;
+  status: string;
+  appointmentType: string;
+};
+
+export default function Home() {
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [currentMonth, setCurrentMonth] = useState<Date>(new Date());
+  
+  const { data: stats, isLoading, refetch: refetchStats } = trpc.dashboard.getStats.useQuery({ date: selectedDate.toISOString() });
+  const { data: tomorrowStats, isLoading: loadingTomorrow, refetch: refetchTomorrow } = trpc.dashboard.getTomorrowStats.useQuery({ date: selectedDate.toISOString() });
+  const { data: monthAppointments } = trpc.dashboard.getMonthAppointments.useQuery({
+    year: currentMonth.getFullYear(),
+    month: currentMonth.getMonth() + 1,
+  });
+  
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [dialogTitle, setDialogTitle] = useState("");
+  const [dialogAppointments, setDialogAppointments] = useState<AppointmentDetail[]>([]);
+
+  const openDialog = (title: string, appointments: AppointmentDetail[]) => {
+    setDialogTitle(title);
+    setDialogAppointments(appointments);
+    setDialogOpen(true);
+  };
+
+  const sendManualReminders = trpc.remindersTrigger.sendManual.useMutation();
+
+  const handleSendReminders = async () => {
+    try {
+      // Get appointment IDs from dialog
+      const appointmentIds = dialogAppointments.map(apt => apt.id);
+      
+      toast.info("Enviando recordatórios...", {
+        description: "Aguarde enquanto os recordatórios são enviados.",
+      });
+
+      const result = await sendManualReminders.mutateAsync({
+        appointmentIds,
+        daysBeforeAppointment: 1,
+      });
+
+      if (result.success) {
+        toast.success(result.message, {
+          description: `Enviados: ${result.sent} | Falhas: ${result.failed}`,
+        });
+        // Refresh stats after sending reminders
+        refetchStats();
+        refetchTomorrow();
+        setDialogOpen(false);
+      } else {
+        toast.error("Error ao enviar recordatórios", {
+          description: result.message,
+        });
+      }
+    } catch (error) {
+      toast.error("Error ao enviar recordatórios", {
+        description: "Ocurrió un error ao processar a solicitação.",
+      });
+    }
+  };
+
+  const handlePreviousMonth = () => {
+    setCurrentMonth(subMonths(currentMonth, 1));
+  };
+
+  const handleNextMonth = () => {
+    setCurrentMonth(addMonths(currentMonth, 1));
+  };
+
+  const handleToday = () => {
+    const today = new Date();
+    setSelectedDate(today);
+    setCurrentMonth(today);
+  };
+
+  const handleDateSelect = (date: Date) => {
+    setSelectedDate(date);
+  };
+
+  // Generate calendar days
+  const monthStart = startOfMonth(currentMonth);
+  const monthEnd = endOfMonth(currentMonth);
+  const daysInMonth = eachDayOfInterval({ start: monthStart, end: monthEnd });
+
+  // Get day of week for first day (0 = Sunday, 1 = Monday, etc)
+  const firstDayOfWeek = monthStart.getDay();
+
+  // Get appointment counts for each day
+  const getAppointmentCountsForDay = (day: Date) => {
+    if (!monthAppointments || typeof monthAppointments !== 'object') {
+      return { confirmed: 0, pending: 0, cancelled: 0 };
+    }
+    
+    const dayNumber = day.getDate();
+    const stats = monthAppointments[dayNumber];
+    
+    if (!stats || typeof stats !== 'object') {
+      return { confirmed: 0, pending: 0, cancelled: 0 };
+    }
+    
+    return {
+      confirmed: stats.confirmed || 0,
+      pending: stats.pending || 0,
+      cancelled: stats.cancelled || 0,
+    };
+  };
+
+  if (isLoading) {
+    return (
+      <DashboardLayout>
+        <div className="flex gap-6">
+          <div className="flex-1 space-y-6">
+            <div>
+              <Skeleton className="h-8 w-48 mb-2" />
+              <Skeleton className="h-4 w-64" />
+            </div>
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+              {[1, 2, 3, 4].map((i) => (
+                <Skeleton key={i} className="h-32" />
+              ))}
+            </div>
+          </div>
+          <div className="w-80">
+            <Skeleton className="h-96" />
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  const today = new Date();
+  const tomorrow = new Date(selectedDate);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+
+  const isSelectedToday = isSameDay(selectedDate, today);
+
+  const pendingCount = (stats?.pending?.count || 0) + (tomorrowStats?.pending?.count || 0);
+
+  return (
+    <DashboardLayout>
+      <div className="max-w-[1600px] mx-auto space-y-6">
+        {/* Distribution Alert Banner - LARGE and PROMINENT */}
+        <DistributionAlertBanner />
+        
+        {/* Dashboard Clock */}
+        <DashboardClock />
+        
+
+        {/* Header with Calendar on Right */}
+        <div className="flex justify-between items-start gap-6">
+          {/* Title Section */}
+          <div className="flex-1">
+            <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
+            <p className="text-muted-foreground">
+              {format(selectedDate, "EEEE, dd 'de' MMMM 'de' yyyy", { locale: es })}
+            </p>
+          </div>
+
+          {/* Compact Calendar - Top Right */}
+          <Card className="w-80">
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <button
+                  onClick={handlePreviousMonth}
+                  className="p-1 hover:bg-accent rounded-md transition-colors"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </button>
+                <CardTitle className="text-sm">
+                  {format(currentMonth, "MMMM yyyy", { locale: es })}
+                </CardTitle>
+                <button
+                  onClick={handleNextMonth}
+                  className="p-1 hover:bg-accent rounded-md transition-colors"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </button>
+              </div>
+            </CardHeader>
+            <CardContent className="pb-3">
+              {/* Calendar Grid */}
+              <div className="space-y-1">
+                {/* Weekday Headers */}
+                <div className="grid grid-cols-7 gap-0.5 text-center text-[10px] font-medium text-muted-foreground mb-1">
+                  <div>D</div>
+                  <div>S</div>
+                  <div>T</div>
+                  <div>Q</div>
+                  <div>Q</div>
+                  <div>S</div>
+                  <div>S</div>
+                </div>
+
+                {/* Calendar Days */}
+                <div className="grid grid-cols-7 gap-0.5">
+                  {/* Empty cells for days before month starts */}
+                  {Array.from({ length: firstDayOfWeek }).map((_, i) => (
+                    <div key={`empty-${i}`} className="h-8" />
+                  ))}
+                  
+                  {/* Actual days */}
+                  {daysInMonth.map((day) => {
+                    const isSelected = isSameDay(day, selectedDate);
+                    const isTodayDate = isToday(day);
+                    const counts = getAppointmentCountsForDay(day);
+                    const hasAppointments = counts.confirmed > 0 || counts.pending > 0 || counts.cancelled > 0;
+
+                    return (
+                      <button
+                        key={day.toISOString()}
+                        onClick={() => handleDateSelect(day)}
+                        className={`
+                          h-8 p-1 text-[10px] rounded transition-colors relative
+                          ${isSelected ? 'bg-primary text-primary-foreground font-bold' : ''}
+                          ${isTodayDate && !isSelected ? 'border border-primary' : ''}
+                          ${!isSelected && !isTodayDate ? 'hover:bg-accent' : ''}
+                        `}
+                      >
+                        <div className="flex flex-col items-center justify-center h-full">
+                          <span>{format(day, 'd')}</span>
+                          {hasAppointments && (
+                            <div className="flex gap-0.5 mt-0.5">
+                              {counts.confirmed > 0 && (
+                                <div 
+                                  className="w-1 h-1 rounded-full bg-green-500" 
+                                  title={`${counts.confirmed} confirmadas`}
+                                />
+                              )}
+                              {counts.pending > 0 && (
+                                <div 
+                                  className="w-1 h-1 rounded-full bg-orange-500"
+                                  title={`${counts.pending} pendientes`}
+                                />
+                              )}
+                              {counts.cancelled > 0 && (
+                                <div 
+                                  className="w-1 h-1 rounded-full bg-red-500"
+                                  title={`${counts.cancelled} canceladas`}
+                                />
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Today Button */}
+              <Button 
+                variant="outline" 
+                size="sm"
+                className="w-full mt-2 text-xs"
+                onClick={handleToday}
+              >
+                Hoy
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Stats Cards - Phase 2 Improvements */}
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+          <Card 
+            className="cursor-pointer hover:shadow-2xl hover:scale-[1.02] transition-all duration-300 bg-gradient-to-br from-blue-500 to-blue-600 text-white border-0 shadow-[0_8px_16px_rgba(59,130,246,0.3)]"
+            onClick={() => openDialog("Citas de Hoy", stats?.todayAppointmentsDetails || [])}
+          >
+            <CardHeader className="flex flex-col items-center space-y-0 pb-2 pt-6">
+              <Calendar className="h-12 w-12 text-white mb-3" />
+            </CardHeader>
+            <CardContent className="text-center">
+              <div className="text-7xl font-extrabold mb-3">{stats?.todayAppointments || 0}</div>
+              <CardTitle className="text-lg font-semibold text-white">Citas de Hoy</CardTitle>
+            </CardContent>
+          </Card>
+
+          <Card 
+            className="cursor-pointer hover:shadow-2xl hover:scale-[1.02] transition-all duration-300 bg-gradient-to-br from-green-500 to-green-600 text-white border-0 shadow-[0_8px_16px_rgba(16,185,129,0.3)]"
+            onClick={() => openDialog("Confirmadas", stats?.confirmed?.appointments || [])}
+          >
+            <CardHeader className="flex flex-col items-center space-y-0 pb-2 pt-6">
+              <CheckCircle2 className="h-12 w-12 text-white mb-3" />
+            </CardHeader>
+            <CardContent className="text-center">
+              <div className="text-7xl font-extrabold mb-3">{stats?.confirmed?.count || 0}</div>
+              <CardTitle className="text-lg font-semibold text-white">Confirmadas</CardTitle>
+            </CardContent>
+          </Card>
+
+          <Card 
+            className="cursor-pointer hover:shadow-2xl hover:scale-[1.02] transition-all duration-300 bg-gradient-to-br from-orange-500 to-orange-600 text-white border-0 shadow-[0_8px_16px_rgba(249,115,22,0.3)]"
+            onClick={() => openDialog("Pendientes", stats?.pending?.appointments || [])}
+          >
+            <CardHeader className="flex flex-col items-center space-y-0 pb-2 pt-6">
+              <Clock className="h-12 w-12 text-white mb-3" />
+            </CardHeader>
+            <CardContent className="text-center">
+              <div className="text-7xl font-extrabold mb-3">{stats?.pending?.count || 0}</div>
+              <CardTitle className="text-lg font-semibold text-white">Pendientes</CardTitle>
+            </CardContent>
+          </Card>
+
+          <Card 
+            className="cursor-pointer hover:shadow-2xl hover:scale-[1.02] transition-all duration-300 bg-gradient-to-br from-purple-500 to-purple-600 text-white border-0 shadow-[0_8px_16px_rgba(168,85,247,0.3)]"
+            onClick={() => openDialog("Completadas", stats?.completed?.appointments || [])}
+          >
+            <CardHeader className="flex flex-col items-center space-y-0 pb-2 pt-6">
+              <Users className="h-12 w-12 text-white mb-3" />
+            </CardHeader>
+            <CardContent className="text-center">
+              <div className="text-7xl font-extrabold mb-3">{stats?.completed?.count || 0}</div>
+              <CardTitle className="text-lg font-semibold text-white">Completadas</CardTitle>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Tomorrow's Appointments Section - ALWAYS SHOW */}
+        {true && (
+          <div className="space-y-4">
+            <h2 className="text-2xl font-semibold">
+              Citas de Mañana - {format(tomorrow, "EEEE, dd 'de' MMMM 'de' yyyy", { locale: es })}
+            </h2>
+            <div className="grid gap-6 md:grid-cols-3">
+              <Card 
+                className="cursor-pointer hover:shadow-2xl hover:scale-[1.02] transition-all duration-300 bg-gradient-to-br from-green-500 to-green-600 text-white border-0 shadow-[0_8px_16px_rgba(16,185,129,0.3)]"
+                onClick={() => openDialog("Confirmadas Mañana", tomorrowStats?.confirmed?.appointments || [])}
+              >
+                <CardHeader className="flex flex-col items-center space-y-0 pb-2 pt-6">
+                  <CheckCircle2 className="h-10 w-10 text-white mb-3" />
+                </CardHeader>
+                <CardContent className="text-center">
+                  <div className="text-6xl font-extrabold mb-3">{tomorrowStats?.confirmed?.count || 0}</div>
+                  <CardTitle className="text-base font-semibold text-white">Confirmadas Mañana</CardTitle>
+                </CardContent>
+              </Card>
+
+              <Card 
+                className="cursor-pointer hover:shadow-2xl hover:scale-[1.02] transition-all duration-300 bg-gradient-to-br from-orange-500 to-orange-600 text-white border-0 shadow-[0_8px_16px_rgba(249,115,22,0.3)]"
+                onClick={() => openDialog("Pendientes Mañana", tomorrowStats?.pending?.appointments || [])}
+              >
+                <CardHeader className="flex flex-col items-center space-y-0 pb-2 pt-6">
+                  <Clock className="h-10 w-10 text-white mb-3" />
+                </CardHeader>
+                <CardContent className="text-center">
+                  <div className="text-6xl font-extrabold mb-3">{tomorrowStats?.pending?.count || 0}</div>
+                  <CardTitle className="text-base font-semibold text-white">Pendientes Mañana</CardTitle>
+                </CardContent>
+              </Card>
+
+              <Card 
+                className="cursor-pointer hover:shadow-2xl hover:scale-[1.02] transition-all duration-300 bg-gradient-to-br from-red-500 to-red-600 text-white border-0 shadow-[0_8px_16px_rgba(239,68,68,0.3)]"
+                onClick={() => openDialog("Canceladas Mañana", tomorrowStats?.cancelled?.appointments || [])}
+              >
+                <CardHeader className="flex flex-col items-center space-y-0 pb-2 pt-6">
+                  <X className="h-10 w-10 text-white mb-3" />
+                </CardHeader>
+                <CardContent className="text-center">
+                  <div className="text-6xl font-extrabold mb-3">{tomorrowStats?.cancelled?.count || 0}</div>
+                  <CardTitle className="text-base font-semibold text-white">Canceladas Mañana</CardTitle>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        )}
+
+        {/* Alert for pending confirmations */}
+        {pendingCount > 0 && (
+            <Card className="border-orange-200 bg-orange-50">
+              <CardContent className="pt-6">
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="h-5 w-5 text-orange-600" />
+                  <p className="text-sm font-medium text-orange-900">
+                    {pendingCount} pacientes no han confirmado su asistencia
+                  </p>
+                </div>
+                <p className="text-xs text-orange-700 mt-1">
+                  El sistema continuará enviando recordatorios automáticos hasta recibir confirmación.
+                </p>
+              </CardContent>
+            </Card>
+          )}
+
+
+      </div>
+
+      {/* Dialog for appointment details */}
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <div className="flex items-center justify-between">
+              <DialogTitle>{dialogTitle}</DialogTitle>
+              {(dialogTitle.includes("Pendientes") || dialogTitle.includes("Pendiente")) && dialogAppointments.length > 0 && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleSendReminders}
+                  className="ml-4"
+                >
+                  <Send className="h-4 w-4 mr-2" />
+                  Enviar Recordatorios Ahora
+                </Button>
+              )}
+            </div>
+          </DialogHeader>
+          <div className="space-y-4">
+            {dialogAppointments.length === 0 ? (
+              <p className="text-muted-foreground text-center py-8">
+                Ninguna consulta encontrada
+              </p>
+            ) : (
+              dialogAppointments.map((apt) => (
+                <Card key={apt.id}>
+                  <CardContent className="pt-6">
+                    <div className="flex justify-between items-start">
+                      <div className="space-y-1">
+                        <p className="font-semibold">{apt.patientName || "Paciente sem nome"}</p>
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <Phone className="h-4 w-4" />
+                          <span>{apt.patientPhone || "Sem telefone"}</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <Clock className="h-4 w-4" />
+                          <span>{format(new Date(apt.appointmentDate), "HH:mm")}</span>
+                        </div>
+                        <div className="text-xs text-muted-foreground mt-1">
+                          Tipo: {apt.appointmentType === 'orthodontics' ? 'Ortodoncia' : 'Clínico General'}
+                        </div>
+                      </div>
+                      <div className={`
+                        px-3 py-1 rounded-full text-xs font-medium
+                        ${apt.status === 'confirmed' ? 'bg-green-100 text-green-700' : ''}
+                        ${apt.status === 'scheduled' || apt.status === 'pending' ? 'bg-orange-100 text-orange-700' : ''}
+                        ${apt.status === 'cancelled' ? 'bg-red-100 text-red-700' : ''}
+                        ${apt.status === 'completed' ? 'bg-purple-100 text-purple-700' : ''}
+                      `}>
+                        {apt.status === 'confirmed' && 'Confirmado'}
+                        {(apt.status === 'scheduled' || apt.status === 'pending') && 'Pendiente'}
+                        {apt.status === 'cancelled' && 'Cancelado'}
+                        {apt.status === 'completed' && 'Completado'}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Quick Add Patient Button */}
+      <QuickAddPatient />
+    </DashboardLayout>
+  );
+}

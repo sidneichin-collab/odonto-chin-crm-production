@@ -1,0 +1,238 @@
+/**
+ * Test Appointments Service
+ * 
+ * Gerencia os 8 agendamentos de teste para envio de mensagens
+ * Dados fornecidos pelo usuário para teste do sistema
+ */
+
+import { PatientAppointment } from "./hourlyReminderService";
+
+/**
+ * Interface estendida com status de confirmação
+ */
+export interface TestPatientAppointment extends PatientAppointment {
+  confirmed?: boolean;
+  confirmedAt?: string;
+}
+
+/**
+ * 8 Pacientes para teste
+ * Dados fornecidos pelo usuário em 27/01/2026
+ * Gloria Gonzales confirmou sua consulta em 28/01/2026
+ */
+export const testAppointments: TestPatientAppointment[] = [
+  {
+    patientName: "Vero Villalba",
+    patientPhone: "595974763690",
+    appointmentDate: "28/01/26",
+    appointmentTime: "9h",
+    appointmentType: "consulta",
+  },
+  {
+    patientName: "Yani Villalba",
+    patientPhone: "595985227917",
+    appointmentDate: "28/01/26",
+    appointmentTime: "10h",
+    appointmentType: "consulta",
+  },
+  {
+    patientName: "Ligia Asuncion",
+    patientPhone: "595994531607",
+    appointmentDate: "28/01/26",
+    appointmentTime: "10h40",
+    appointmentType: "consulta",
+  },
+  {
+    patientName: "Liz Salinas",
+    patientPhone: "595992478413",
+    appointmentDate: "28/01/26",
+    appointmentTime: "13h30",
+    appointmentType: "consulta",
+  },
+  {
+    patientName: "Gloria Gonzales",
+    patientPhone: "595981948586",
+    appointmentDate: "28/01/26",
+    appointmentTime: "14h",
+    appointmentType: "consulta",
+    confirmed: true,
+    confirmedAt: new Date().toISOString(),
+  },
+  {
+    patientName: "Ruth",
+    patientPhone: "59177379112",
+    appointmentDate: "28/01/26",
+    appointmentTime: "14h20",
+    appointmentType: "consulta",
+  },
+  {
+    patientName: "Carolina Mutu",
+    patientPhone: "59171657569",
+    appointmentDate: "28/01/26",
+    appointmentTime: "15h",
+    appointmentType: "consulta",
+  },
+  {
+    patientName: "Iris Capiata",
+    patientPhone: "595991650001",
+    appointmentDate: "28/01/26",
+    appointmentTime: "15h20",
+    appointmentType: "consulta",
+  },
+];
+
+/**
+ * Obter todos os agendamentos de teste
+ */
+export function getTestAppointments(): TestPatientAppointment[] {
+  return testAppointments;
+}
+
+/**
+ * Obter apenas agendamentos confirmados
+ */
+export function getConfirmedAppointments(): TestPatientAppointment[] {
+  return testAppointments.filter(apt => apt.confirmed === true);
+}
+
+/**
+ * Obter apenas agendamentos pendentes (não confirmados)
+ */
+export function getPendingAppointments(): TestPatientAppointment[] {
+  return testAppointments.filter(apt => apt.confirmed !== true);
+}
+
+/**
+ * Obter agendamentos de teste para uma data específica
+ */
+export function getTestAppointmentsByDate(date: string): TestPatientAppointment[] {
+  return testAppointments.filter(apt => apt.appointmentDate === date);
+}
+
+/**
+ * Obter agendamentos de teste para um horário específico
+ */
+export function getTestAppointmentsByTime(time: string): TestPatientAppointment[] {
+  return testAppointments.filter(apt => apt.appointmentTime === time);
+}
+
+/**
+ * Marcar um agendamento como confirmado
+ */
+export function confirmAppointment(patientPhone: string): TestPatientAppointment | null {
+  const apt = testAppointments.find(a => a.patientPhone === patientPhone);
+  if (apt) {
+    apt.confirmed = true;
+    apt.confirmedAt = new Date().toISOString();
+    return apt;
+  }
+  return null;
+}
+
+/**
+ * Desmarcar um agendamento como confirmado
+ */
+export function unconfirmAppointment(patientPhone: string): TestPatientAppointment | null {
+  const apt = testAppointments.find(a => a.patientPhone === patientPhone);
+  if (apt) {
+    apt.confirmed = false;
+    apt.confirmedAt = undefined;
+    return apt;
+  }
+  return null;
+}
+
+/**
+ * Obter agendamentos que já passaram (para pós-atendimento)
+ * Calcula 2 horas após o horário da consulta
+ */
+export function getTestAppointmentsForPostAttendance(
+  currentTime: Date
+): TestPatientAppointment[] {
+  return testAppointments.filter(apt => {
+    // Parse appointment time (formato: "9h", "10h", "14h30", etc)
+    const timeParts = apt.appointmentTime.match(/(\d+)h?(\d*)/);
+    if (!timeParts) return false;
+
+    let hours = parseInt(timeParts[1]);
+    let minutes = timeParts[2] ? parseInt(timeParts[2]) : 0;
+
+    // Adicionar 2 horas
+    hours += 2;
+
+    // Ajustar se ultrapassar 24 horas
+    if (hours >= 24) {
+      hours -= 24;
+    }
+
+    const appointmentEndTime = new Date();
+    appointmentEndTime.setHours(hours, minutes, 0, 0);
+
+    // Se o tempo atual é maior ou igual ao tempo de pós-atendimento, enviar
+    return currentTime >= appointmentEndTime;
+  });
+}
+
+/**
+ * Validar dados dos agendamentos
+ */
+export function validateTestAppointments(): {
+  valid: boolean;
+  errors: string[];
+} {
+  const errors: string[] = [];
+
+  testAppointments.forEach((apt, index) => {
+    if (!apt.patientName || apt.patientName.trim() === "") {
+      errors.push(`Agendamento ${index + 1}: Nome do paciente vazio`);
+    }
+
+    if (!apt.patientPhone || apt.patientPhone.trim() === "") {
+      errors.push(`Agendamento ${index + 1}: Telefone vazio`);
+    }
+
+    if (!apt.patientPhone.match(/^\d+$/)) {
+      errors.push(
+        `Agendamento ${index + 1}: Telefone inválido (${apt.patientPhone})`
+      );
+    }
+
+    if (!apt.appointmentTime || !apt.appointmentTime.match(/^\d+h(\d+)?$/)) {
+      errors.push(
+        `Agendamento ${index + 1}: Horário inválido (${apt.appointmentTime})`
+      );
+    }
+
+    if (!apt.appointmentDate) {
+      errors.push(`Agendamento ${index + 1}: Data vazia`);
+    }
+  });
+
+  return {
+    valid: errors.length === 0,
+    errors,
+  };
+}
+
+/**
+ * Obter resumo dos agendamentos
+ */
+export function getTestAppointmentsSummary(): {
+  total: number;
+  byTime: { [key: string]: number };
+  patients: string[];
+} {
+  const byTime: { [key: string]: number } = {};
+  const patients: string[] = [];
+
+  testAppointments.forEach(apt => {
+    byTime[apt.appointmentTime] = (byTime[apt.appointmentTime] || 0) + 1;
+    patients.push(apt.patientName);
+  });
+
+  return {
+    total: testAppointments.length,
+    byTime,
+    patients,
+  };
+}

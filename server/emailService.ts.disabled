@@ -1,0 +1,442 @@
+import nodemailer from "nodemailer";
+import { getDb } from "./db";
+import { emailConfigs } from "../drizzle/schema";
+import { eq } from "drizzle-orm";
+
+interface EmailConfig {
+  host: string;
+  port: number;
+  secure: boolean;
+  user: string;
+  password: string;
+  fromName: string;
+  fromEmail: string;
+}
+
+/**
+ * Get email configuration for a clinic
+ */
+async function getEmailConfig(clinicName: string): Promise<EmailConfig | null> {
+  const db = await getDb();
+  if (!db) return null;
+
+  const result = await db
+    .select()
+    .from(emailConfigs)
+    .where(eq(emailConfigs.clinicName, clinicName))
+    .limit(1);
+
+  if (result.length === 0) return null;
+
+  const config = result[0];
+  return {
+    host: config.smtpHost,
+    port: config.smtpPort,
+    secure: false, // Will be true if port is 465
+    user: config.smtpUser,
+    password: config.smtpPassword,
+    fromName: config.clinicName,
+    fromEmail: config.emailAddress,
+  };
+}
+
+/**
+ * Send email using clinic's SMTP configuration
+ */
+export async function sendEmail(
+  clinicId: string,
+  to: string,
+  subject: string,
+  htmlContent: string,
+  textContent?: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const config = await getEmailConfig(clinicId);
+
+    if (!config) {
+      return {
+        success: false,
+        error: "Configuração de email não encontrada para esta clínica",
+      };
+    }
+
+    // Create transporter
+    const transporter = nodemailer.createTransport({
+      host: config.host,
+      port: config.port,
+      secure: config.secure,
+      auth: {
+        user: config.user,
+        pass: config.password,
+      },
+    });
+
+    // Send email
+    await transporter.sendMail({
+      from: `"${config.fromName}" <${config.fromEmail}>`,
+      to,
+      subject,
+      text: textContent || htmlContent.replace(/<[^>]*>/g, ""), // Strip HTML if no text provided
+      html: htmlContent,
+    });
+
+    console.log(`[Email] Sent to ${to} for clinic ${clinicId}`);
+
+    return { success: true };
+  } catch (error) {
+    console.error(`[Email] Error sending email:`, error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Erro ao enviar email",
+    };
+  }
+}
+
+/**
+ * Send appointment reminder email
+ */
+export async function sendAppointmentReminderEmail(
+  clinicId: string,
+  patientEmail: string,
+  patientName: string,
+  appointmentDate: Date,
+  appointmentType: string
+): Promise<{ success: boolean; error?: string }> {
+  const formattedDate = appointmentDate.toLocaleDateString("pt-BR", {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+
+  const formattedTime = appointmentDate.toLocaleTimeString("pt-BR", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+
+  const subject = `Lembrete: Consulta agendada para ${formattedDate}`;
+
+  const htmlContent = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="UTF-8">
+      <style>
+        body {
+          font-family: Arial, sans-serif;
+          line-height: 1.6;
+          color: #333;
+        }
+        .container {
+          max-width: 600px;
+          margin: 0 auto;
+          padding: 20px;
+          background-color: #f9f9f9;
+        }
+        .header {
+          background-color: #3B82F6;
+          color: white;
+          padding: 20px;
+          text-align: center;
+          border-radius: 8px 8px 0 0;
+        }
+        .content {
+          background-color: white;
+          padding: 30px;
+          border-radius: 0 0 8px 8px;
+        }
+        .highlight {
+          background-color: #EFF6FF;
+          padding: 15px;
+          border-left: 4px solid #3B82F6;
+          margin: 20px 0;
+        }
+        .button {
+          display: inline-block;
+          padding: 12px 24px;
+          background-color: #10B981;
+          color: white;
+          text-decoration: none;
+          border-radius: 6px;
+          margin-top: 20px;
+        }
+        .footer {
+          text-align: center;
+          margin-top: 20px;
+          font-size: 12px;
+          color: #666;
+        }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h1>🦷 ODONTO CHIN</h1>
+          <p>Lembrete de Consulta</p>
+        </div>
+        <div class="content">
+          <p>Olá <strong>${patientName}</strong>,</p>
+          
+          <p>Este é um lembrete da sua consulta agendada:</p>
+          
+          <div class="highlight">
+            <p><strong>📅 Data:</strong> ${formattedDate}</p>
+            <p><strong>🕐 Horário:</strong> ${formattedTime}</p>
+            <p><strong>🔧 Tipo:</strong> ${appointmentType === "orthodontic_treatment" ? "Ortodontia" : appointmentType === "general_clinic" ? "Clínico Geral" : "Primeira Consulta"}</p>
+          </div>
+          
+          <p>Por favor, confirme sua presença respondendo a este email ou entrando em contato conosco.</p>
+          
+          <p><strong>⚠️ Importante:</strong> Caso não possa comparecer, pedimos que avise com antecedência para que possamos disponibilizar o horário para outro paciente.</p>
+          
+          <div style="text-align: center;">
+            <a href="mailto:contato@odontochin.com.br?subject=Confirmação de Consulta - ${patientName}" class="button">
+              ✓ Confirmar Presença
+            </a>
+          </div>
+          
+          <p style="margin-top: 30px;">Aguardamos você!</p>
+          <p><strong>Equipe ODONTO CHIN</strong></p>
+        </div>
+        <div class="footer">
+          <p>Este é um email automático. Por favor, não responda diretamente.</p>
+          <p>© 2026 ODONTO CHIN - Todos os direitos reservados</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+
+  const textContent = `
+Olá ${patientName},
+
+Este é um lembrete da sua consulta agendada:
+
+📅 Data: ${formattedDate}
+🕐 Horário: ${formattedTime}
+🔧 Tipo: ${appointmentType === "orthodontic_treatment" ? "Ortodontia" : appointmentType === "general_clinic" ? "Clínico Geral" : "Primeira Consulta"}
+
+Por favor, confirme sua presença respondendo a este email ou entrando em contato conosco.
+
+⚠️ Importante: Caso não possa comparecer, pedimos que avise com antecedência para que possamos disponibilizar o horário para outro paciente.
+
+Aguardamos você!
+Equipe ODONTO CHIN
+  `;
+
+  return await sendEmail(clinicId, patientEmail, subject, htmlContent, textContent);
+}
+
+/**
+ * Send reminder email with persuasion level (for multi-channel escalation)
+ */
+export async function sendReminderEmail(params: {
+  clinicId: string;
+  to: string;
+  patientName: string;
+  appointmentDate: Date;
+  appointmentType: string;
+  messageContent: string;
+  persuasionLevel: "normal" | "medium" | "high" | "urgent" | "very_urgent";
+}): Promise<{ success: boolean; messageId?: string; error?: string }> {
+  try {
+    const config = await getEmailConfig(params.clinicId);
+
+    if (!config) {
+      return {
+        success: false,
+        error: "Configuração de email não encontrada para esta clínica",
+      };
+    }
+
+    const subject = getEmailSubject(params.persuasionLevel, params.appointmentType);
+    const htmlContent = generateEscalationEmailHTML(params, config.fromName);
+
+    // Create transporter
+    const transporter = nodemailer.createTransport({
+      host: config.host,
+      port: config.port,
+      secure: config.secure,
+      auth: {
+        user: config.user,
+        pass: config.password,
+      },
+    });
+
+    // Send email
+    const info = await transporter.sendMail({
+      from: `"${config.fromName}" <${config.fromEmail}>`,
+      to: params.to,
+      subject: subject,
+      text: params.messageContent,
+      html: htmlContent,
+    });
+
+    console.log(`[Email] Reminder sent to ${params.to} with persuasion level ${params.persuasionLevel}`);
+
+    return {
+      success: true,
+      messageId: info.messageId,
+    };
+  } catch (error) {
+    console.error(`[Email] Error sending reminder email:`, error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Erro ao enviar email",
+    };
+  }
+}
+
+/**
+ * Generate email subject based on persuasion level
+ */
+function getEmailSubject(
+  level: "normal" | "medium" | "high" | "urgent" | "very_urgent",
+  appointmentType: string
+): string {
+  const typeLabel =
+    appointmentType === "orthodontic_treatment"
+      ? "Mantenimiento Ortodóntico"
+      : "Consulta";
+
+  switch (level) {
+    case "normal":
+      return `Recordatorio: ${typeLabel} Próximo`;
+    case "medium":
+      return `⏰ Recordatorio Importante: ${typeLabel}`;
+    case "high":
+      return `⚠️ Confirmación Necesaria: ${typeLabel}`;
+    case "urgent":
+      return `🔔 URGENTE: Confirme su ${typeLabel}`;
+    case "very_urgent":
+      return `🚨 ÚLTIMA OPORTUNIDAD: Confirme su ${typeLabel}`;
+    default:
+      return `Recordatorio: ${typeLabel}`;
+  }
+}
+
+/**
+ * Generate HTML email content for escalation system
+ */
+function generateEscalationEmailHTML(params: {
+  patientName: string;
+  appointmentDate: Date;
+  appointmentType: string;
+  messageContent: string;
+  persuasionLevel: "normal" | "medium" | "high" | "urgent" | "very_urgent";
+}, clinicName: string): string {
+  const formattedDate = params.appointmentDate.toLocaleDateString("es-ES", {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+
+  const urgencyColor = {
+    normal: "#3b82f6",
+    medium: "#f59e0b",
+    high: "#ef4444",
+    urgent: "#dc2626",
+    very_urgent: "#991b1b",
+  }[params.persuasionLevel];
+
+  return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Recordatorio de Cita</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f3f4f6;">
+  <table role="presentation" style="width: 100%; border-collapse: collapse;">
+    <tr>
+      <td align="center" style="padding: 40px 0;">
+        <table role="presentation" style="width: 600px; border-collapse: collapse; background-color: #ffffff; border-radius: 8px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
+          <tr>
+            <td style="padding: 40px 40px 20px; text-align: center; background-color: ${urgencyColor}; border-radius: 8px 8px 0 0;">
+              <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: bold;">
+                ${clinicName}
+              </h1>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 40px;">
+              <h2 style="margin: 0 0 20px; color: #1f2937; font-size: 24px;">
+                Hola ${params.patientName},
+              </h2>
+              <p style="margin: 0 0 20px; color: #4b5563; font-size: 16px; line-height: 1.6;">
+                ${params.messageContent.replace(/\n/g, "<br>")}
+              </p>
+              <div style="background-color: #f9fafb; border-left: 4px solid ${urgencyColor}; padding: 20px; margin: 30px 0; border-radius: 4px;">
+                <p style="margin: 0 0 10px; color: #1f2937; font-size: 14px; font-weight: bold;">
+                  📅 Fecha y Hora:
+                </p>
+                <p style="margin: 0; color: #4b5563; font-size: 16px;">
+                  ${formattedDate}
+                </p>
+              </div>
+              <p style="margin: 30px 0 0; color: #6b7280; font-size: 14px; text-align: center;">
+                Si necesitas reagendar, por favor contáctanos lo antes posible.
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 20px 40px; background-color: #f9fafb; border-radius: 0 0 8px 8px; text-align: center;">
+              <p style="margin: 0; color: #6b7280; font-size: 14px;">
+                ${clinicName}
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+  `.trim();
+}
+
+/**
+ * Test email configuration
+ */
+export async function testEmailConfig(clinicId: string): Promise<{
+  success: boolean;
+  error?: string;
+}> {
+  try {
+    const config = await getEmailConfig(clinicId);
+
+    if (!config) {
+      return {
+        success: false,
+        error: "Configuração de email não encontrada",
+      };
+    }
+
+    const transporter = nodemailer.createTransport({
+      host: config.host,
+      port: config.port,
+      secure: config.secure,
+      auth: {
+        user: config.user,
+        pass: config.password,
+      },
+    });
+
+    // Verify connection
+    await transporter.verify();
+
+    console.log(`[Email] Configuration test successful for clinic ${clinicId}`);
+
+    return { success: true };
+  } catch (error) {
+    console.error(`[Email] Configuration test failed:`, error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Erro ao testar configuração",
+    };
+  }
+}

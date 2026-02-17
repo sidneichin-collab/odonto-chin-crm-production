@@ -1,0 +1,18 @@
+{
+  "query": "SHOW COLUMNS FROM appointments LIKE 'chair';",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3dy73aS7obdDVgV.73116cb9d21b --database Xh2xRagQAoY5NjF5TC3DfV --execute SHOW COLUMNS FROM appointments LIKE 'chair';",
+  "rows": [
+    {
+      "Field": "chair",
+      "Type": "int(11)",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    }
+  ],
+  "messages": [],
+  "stdout": "Field\tType\tNull\tKey\tDefault\tExtra\nchair\tint(11)\tYES\t\tNULL\t\n",
+  "stderr": "",
+  "execution_time_ms": 49
+}

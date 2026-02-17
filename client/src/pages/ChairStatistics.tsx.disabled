@@ -1,0 +1,627 @@
+import { useState } from "react";
+import DashboardLayout from "@/components/DashboardLayout";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { trpc } from "@/lib/trpc";
+import { BarChart3, TrendingUp, Clock, DollarSign, Calendar, ArrowLeft, Settings, Sparkles } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { useLocation } from "wouter";
+
+export default function ChairStatistics() {
+  const [, setLocation] = useLocation();
+  const [selectedPeriod, setSelectedPeriod] = useState<"week" | "month" | "year" | "custom">("month");
+  const [selectedChair, setSelectedChair] = useState<string>("all");
+  const [startDate, setStartDate] = useState<string>("");
+  const [endDate, setEndDate] = useState<string>("");
+  
+  // Fetch real statistics from backend
+  const { data: chairStats, isLoading } = trpc.chairStatistics.getByPeriod.useQuery({
+    period: selectedPeriod,
+    startDate: selectedPeriod === "custom" ? startDate : undefined,
+    endDate: selectedPeriod === "custom" ? endDate : undefined,
+    chair: selectedChair !== "all" ? selectedChair : undefined,
+  });
+
+  const currentStats = chairStats || [];
+
+  // Mock data for reference (removed)
+  const chairStatsMock = {
+    week: [
+      {
+        chair: "Cadeira 1 Orto",
+        occupancyRate: 85,
+        totalAppointments: 34,
+        completedAppointments: 32,
+        cancelledAppointments: 2,
+        averageDuration: 45,
+        revenue: 15400,
+        productivityScore: 92,
+      },
+      {
+        chair: "Cadeira 2 Orto",
+        occupancyRate: 78,
+        totalAppointments: 31,
+        completedAppointments: 28,
+        cancelledAppointments: 3,
+        averageDuration: 42,
+        revenue: 13200,
+        productivityScore: 85,
+      },
+      {
+        chair: "Cadeira 3 Orto",
+        occupancyRate: 72,
+        totalAppointments: 29,
+        completedAppointments: 27,
+        cancelledAppointments: 2,
+        averageDuration: 40,
+        revenue: 12100,
+        productivityScore: 80,
+      },
+      {
+        chair: "Cadeira Clínico Geral",
+        occupancyRate: 65,
+        totalAppointments: 26,
+        completedAppointments: 24,
+        cancelledAppointments: 2,
+        averageDuration: 35,
+        revenue: 8900,
+        productivityScore: 75,
+      },
+    ],
+    month: [
+      {
+        chair: "Cadeira 1 Orto",
+        occupancyRate: 82,
+        totalAppointments: 142,
+        completedAppointments: 135,
+        cancelledAppointments: 7,
+        averageDuration: 46,
+        revenue: 64800,
+        productivityScore: 90,
+      },
+      {
+        chair: "Cadeira 2 Orto",
+        occupancyRate: 76,
+        totalAppointments: 128,
+        completedAppointments: 120,
+        cancelledAppointments: 8,
+        averageDuration: 43,
+        revenue: 56400,
+        productivityScore: 83,
+      },
+      {
+        chair: "Cadeira 3 Orto",
+        occupancyRate: 70,
+        totalAppointments: 118,
+        completedAppointments: 112,
+        cancelledAppointments: 6,
+        averageDuration: 41,
+        revenue: 51200,
+        productivityScore: 78,
+      },
+      {
+        chair: "Cadeira Clínico Geral",
+        occupancyRate: 63,
+        totalAppointments: 106,
+        completedAppointments: 98,
+        cancelledAppointments: 8,
+        averageDuration: 36,
+        revenue: 38600,
+        productivityScore: 72,
+      },
+    ],
+    year: [
+      {
+        chair: "Cadeira 1 Orto",
+        occupancyRate: 80,
+        totalAppointments: 1680,
+        completedAppointments: 1596,
+        cancelledAppointments: 84,
+        averageDuration: 45,
+        revenue: 756000,
+        productivityScore: 88,
+      },
+      {
+        chair: "Cadeira 2 Orto",
+        occupancyRate: 74,
+        totalAppointments: 1512,
+        completedAppointments: 1425,
+        cancelledAppointments: 87,
+        averageDuration: 43,
+        revenue: 672000,
+        productivityScore: 81,
+      },
+      {
+        chair: "Cadeira 3 Orto",
+        occupancyRate: 68,
+        totalAppointments: 1392,
+        completedAppointments: 1320,
+        cancelledAppointments: 72,
+        averageDuration: 41,
+        revenue: 612000,
+        productivityScore: 76,
+      },
+      {
+        chair: "Cadeira Clínico Geral",
+        occupancyRate: 61,
+        totalAppointments: 1248,
+        completedAppointments: 1152,
+        cancelledAppointments: 96,
+        averageDuration: 36,
+        revenue: 456000,
+        productivityScore: 70,
+      },
+    ],
+  };
+
+  const getOccupancyColor = (rate: number) => {
+    if (rate >= 80) return "text-green-600 dark:text-green-400";
+    if (rate >= 60) return "text-yellow-600 dark:text-yellow-400";
+    return "text-red-600 dark:text-red-400";
+  };
+
+  const getProductivityColor = (score: number) => {
+    if (score >= 85) return "bg-green-500";
+    if (score >= 70) return "bg-yellow-500";
+    return "bg-red-500";
+  };
+
+  const periodLabels = {
+    week: "Esta Semana",
+    month: "Este Mês",
+    year: "Este Ano",
+    custom: "Período Personalizado",
+  };
+
+  // Get unique chairs from stats
+  const availableChairs = ["all", ...Array.from(new Set(chairStats?.map(s => s.chair) || []))];
+
+  // Quick filter buttons
+  const setQuickFilter = (days: number) => {
+    const end = new Date();
+    const start = new Date();
+    start.setDate(start.getDate() - days);
+    setStartDate(start.toISOString().split('T')[0]);
+    setEndDate(end.toISOString().split('T')[0]);
+    setSelectedPeriod("custom");
+  };
+
+  if (isLoading) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-96">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+            <p className="text-muted-foreground">Carregando estatísticas...</p>
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  if (currentStats.length === 0) {
+    return (
+      <DashboardLayout>
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setLocation("/agendamentos")}
+              >
+                <ArrowLeft className="h-5 w-5" />
+              </Button>
+              <div>
+                <h1 className="text-3xl font-bold tracking-tight">Estatísticas por Cadeira</h1>
+                <p className="text-muted-foreground mt-2">
+                  Análise de ocupação, produtividade e receita por cadeira
+                </p>
+              </div>
+            </div>
+          </div>
+          <Button
+            onClick={() => setLocation("/occupancy-settings")}
+            variant="outline"
+            className="gap-2"
+          >
+            <Settings className="h-4 w-4" />
+            Configurar Alertas
+          </Button>
+          <Card>
+            <CardContent className="p-12 text-center">
+              <BarChart3 className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
+              <h3 className="text-xl font-semibold mb-2">Nenhum dado disponível</h3>
+              <p className="text-muted-foreground">
+                Não há consultas registradas para o período selecionado.
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  return (
+    <DashboardLayout>
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="flex items-center justify-between flex-wrap gap-4">
+          <div className="flex items-center gap-4">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setLocation("/agendamentos")}
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <div>
+              <h1 className="text-3xl font-bold tracking-tight">Estatísticas por Cadeira</h1>
+              <p className="text-muted-foreground mt-2">
+                Análise de ocupação, produtividade e receita por cadeira
+              </p>
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-2 flex-wrap">
+            <Button
+              onClick={() => setLocation("/occupancy-forecast")}
+              variant="default"
+              className="gap-2"
+            >
+              <Sparkles className="h-4 w-4" />
+              Previsão Inteligente
+            </Button>
+            <Button
+              onClick={() => setLocation("/chair-trends")}
+              variant="outline"
+              className="gap-2"
+            >
+              <TrendingUp className="h-4 w-4" />
+              Ver Tendências
+            </Button>
+            <Button
+              onClick={() => setLocation("/occupancy-settings")}
+              variant="outline"
+              className="gap-2"
+            >
+              <Settings className="h-4 w-4" />
+              Configurar Alertas
+            </Button>
+          </div>
+        </div>
+
+        {/* Filtros Avançados */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Filtros</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {/* Filtro de Cadeira */}
+              <div>
+                <label className="text-sm font-medium mb-2 block">Cadeira</label>
+                <Select value={selectedChair} onValueChange={setSelectedChair}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas as Cadeiras</SelectItem>
+                    {availableChairs.filter(c => c !== "all").map(chair => (
+                      <SelectItem key={chair} value={chair}>{chair}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Filtro de Período */}
+              <div>
+                <label className="text-sm font-medium mb-2 block">Período</label>
+                <Select value={selectedPeriod} onValueChange={(value: any) => setSelectedPeriod(value)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="week">Esta Semana</SelectItem>
+                    <SelectItem value="month">Este Mês</SelectItem>
+                    <SelectItem value="year">Este Ano</SelectItem>
+                    <SelectItem value="custom">Personalizado</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Data Inicial (só aparece em custom) */}
+              {selectedPeriod === "custom" && (
+                <div>
+                  <label className="text-sm font-medium mb-2 block">Data Inicial</label>
+                  <input
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    className="w-full px-3 py-2 border rounded-md bg-background"
+                  />
+                </div>
+              )}
+
+              {/* Data Final (só aparece em custom) */}
+              {selectedPeriod === "custom" && (
+                <div>
+                  <label className="text-sm font-medium mb-2 block">Data Final</label>
+                  <input
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    className="w-full px-3 py-2 border rounded-md bg-background"
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* Filtros Rápidos */}
+            <div className="mt-4">
+              <label className="text-sm font-medium mb-2 block">Filtros Rápidos</label>
+              <div className="flex gap-2 flex-wrap">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setSelectedPeriod("week");
+                    setStartDate("");
+                    setEndDate("");
+                  }}
+                >
+                  Esta Semana
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setQuickFilter(30)}
+                >
+                  Últimos 30 dias
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setQuickFilter(60)}
+                >
+                  Últimos 60 dias
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setQuickFilter(90)}
+                >
+                  Últimos 90 dias
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setSelectedChair("all");
+                    setSelectedPeriod("month");
+                    setStartDate("");
+                    setEndDate("");
+                  }}
+                >
+                  Limpar Filtros
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Summary Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                Taxa de Ocupação Média
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {Math.round(currentStats.reduce((acc, s) => acc + s.occupancyRate, 0) / currentStats.length)}%
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Todas as cadeiras
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                Total de Consultas
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {currentStats.reduce((acc, s) => acc + s.totalAppointments, 0)}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                {periodLabels[selectedPeriod]}
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                Receita Total
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                R$ {currentStats.reduce((acc, s) => acc + s.revenue, 0).toLocaleString('pt-BR')}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                {periodLabels[selectedPeriod]}
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                Taxa de Conclusão
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {Math.round((currentStats.reduce((acc, s) => acc + s.completedAppointments, 0) / 
+                  currentStats.reduce((acc, s) => acc + s.totalAppointments, 0)) * 100)}%
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Consultas completadas
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Chair Statistics Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {currentStats.map((stat) => (
+            <Card key={stat.chair}>
+              <CardHeader>
+                <CardTitle className="flex items-center justify-between">
+                  <span>{stat.chair}</span>
+                  <span className={`text-2xl font-bold ${getOccupancyColor(stat.occupancyRate)}`}>
+                    {stat.occupancyRate}%
+                  </span>
+                </CardTitle>
+                <CardDescription>
+                  Análise de desempenho - {periodLabels[selectedPeriod]}
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {/* Productivity Score Bar */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">Score de Produtividade</span>
+                    <span className="font-semibold">{stat.productivityScore}/100</span>
+                  </div>
+                  <div className="w-full bg-muted rounded-full h-2">
+                    <div
+                      className={`h-2 rounded-full ${getProductivityColor(stat.productivityScore)}`}
+                      style={{ width: `${stat.productivityScore}%` }}
+                    />
+                  </div>
+                </div>
+
+                {/* Metrics Grid */}
+                <div className="grid grid-cols-2 gap-4 pt-2">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <Calendar className="h-4 w-4" />
+                      <span className="text-xs">Total de Consultas</span>
+                    </div>
+                    <p className="text-xl font-bold">{stat.totalAppointments}</p>
+                  </div>
+
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <TrendingUp className="h-4 w-4" />
+                      <span className="text-xs">Completadas</span>
+                    </div>
+                    <p className="text-xl font-bold text-green-600 dark:text-green-400">
+                      {stat.completedAppointments}
+                    </p>
+                  </div>
+
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <Clock className="h-4 w-4" />
+                      <span className="text-xs">Duração Média</span>
+                    </div>
+                    <p className="text-xl font-bold">{stat.averageDuration} min</p>
+                  </div>
+
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <DollarSign className="h-4 w-4" />
+                      <span className="text-xs">Receita</span>
+                    </div>
+                    <p className="text-xl font-bold text-blue-600 dark:text-blue-400">
+                      R$ {stat.revenue.toLocaleString('pt-BR')}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Cancellation Rate */}
+                <div className="pt-2 border-t">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">Taxa de Cancelamento</span>
+                    <span className={`font-semibold ${
+                      (stat.cancelledAppointments / stat.totalAppointments * 100) > 10 
+                        ? 'text-red-600 dark:text-red-400' 
+                        : 'text-green-600 dark:text-green-400'
+                    }`}>
+                      {Math.round(stat.cancelledAppointments / stat.totalAppointments * 100)}%
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {stat.cancelledAppointments} de {stat.totalAppointments} consultas canceladas
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+
+        {/* Insights */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <BarChart3 className="h-5 w-5" />
+              Insights e Recomendações
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {currentStats[0].occupancyRate > 80 && (
+              <div className="flex items-start gap-3 p-3 bg-green-50 dark:bg-green-950/20 rounded-lg">
+                <TrendingUp className="h-5 w-5 text-green-600 dark:text-green-400 mt-0.5" />
+                <div>
+                  <p className="font-semibold text-green-900 dark:text-green-100">
+                    Excelente desempenho da {currentStats[0].chair}!
+                  </p>
+                  <p className="text-sm text-green-700 dark:text-green-300 mt-1">
+                    Com {currentStats[0].occupancyRate}% de ocupação, esta cadeira está sendo muito bem aproveitada.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {currentStats.some(s => s.occupancyRate < 65) && (
+              <div className="flex items-start gap-3 p-3 bg-yellow-50 dark:bg-yellow-950/20 rounded-lg">
+                <Clock className="h-5 w-5 text-yellow-600 dark:text-yellow-400 mt-0.5" />
+                <div>
+                  <p className="font-semibold text-yellow-900 dark:text-yellow-100">
+                    Oportunidade de melhoria
+                  </p>
+                  <p className="text-sm text-yellow-700 dark:text-yellow-300 mt-1">
+                    {currentStats.filter(s => s.occupancyRate < 65).map(s => s.chair).join(", ")} 
+                    {currentStats.filter(s => s.occupancyRate < 65).length === 1 ? " está" : " estão"} com ocupação abaixo de 65%. 
+                    Considere estratégias de marketing ou ajuste de horários.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            <div className="flex items-start gap-3 p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg">
+              <DollarSign className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5" />
+              <div>
+                <p className="font-semibold text-blue-900 dark:text-blue-100">
+                  Receita por Cadeira
+                </p>
+                <p className="text-sm text-blue-700 dark:text-blue-300 mt-1">
+                  A receita média por cadeira é R$ {Math.round(currentStats.reduce((acc, s) => acc + s.revenue, 0) / currentStats.length).toLocaleString('pt-BR')}. 
+                  Cadeiras com maior ocupação tendem a gerar mais receita.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </DashboardLayout>
+  );
+}

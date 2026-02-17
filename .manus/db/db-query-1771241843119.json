@@ -1,0 +1,18 @@
+{
+  "query": "SHOW COLUMNS FROM users LIKE 'account_status';",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3dy73aS7obdDVgV.73116cb9d21b --database Xh2xRagQAoY5NjF5TC3DfV --execute SHOW COLUMNS FROM users LIKE 'account_status';",
+  "rows": [
+    {
+      "Field": "account_status",
+      "Type": "enum('pending','approved','rejected','suspended')",
+      "Null": "NO",
+      "Key": "",
+      "Default": "pending",
+      "Extra": ""
+    }
+  ],
+  "messages": [],
+  "stdout": "Field\tType\tNull\tKey\tDefault\tExtra\naccount_status\tenum('pending','approved','rejected','suspended')\tNO\t\tpending\t\n",
+  "stderr": "",
+  "execution_time_ms": 49
+}

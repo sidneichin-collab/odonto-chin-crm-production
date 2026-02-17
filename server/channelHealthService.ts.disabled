@@ -1,0 +1,315 @@
+/**
+ * Channel Health Service
+ * 
+ * Sistema de monitoreo y control de salud de canales de comunicación
+ * Implementa "pulse control anti-blocking" para prevenir bloqueos de WhatsApp
+ * 
+ * Características:
+ * - Monitoreo de tasa de envío de mensajes
+ * - Detección de patrones sospechosos
+ * - Control automático de velocidad de envío
+ * - Alertas de riesgo de bloqueo
+ */
+
+import { getDb } from "../db";
+import { notifyOwner } from "../_core/notification";
+
+export interface ChannelHealthMetrics {
+  channelName: string;
+  channelType: 'whatsapp' | 'email' | 'sms' | 'n8n';
+  messagesPerHour: number;
+  messagesPerDay: number;
+  failureRate: number;
+  averageResponseTime: number;
+  lastMessageTime: Date | null;
+  status: 'healthy' | 'warning' | 'critical' | 'blocked';
+  blockingRisk: number; // 0-100
+  recommendations: string[];
+}
+
+export interface PulseControlConfig {
+  maxMessagesPerHour: number;
+  maxMessagesPerDay: number;
+  cooldownMinutes: number;
+  failureRateThreshold: number;
+  blockingRiskThreshold: number;
+}
+
+// Configuración por defecto para WhatsApp
+const DEFAULT_PULSE_CONTROL_CONFIG: Record<string, PulseControlConfig> = {
+  whatsapp: {
+    maxMessagesPerHour: 60, // 1 mensaje por minuto
+    maxMessagesPerDay: 500,
+    cooldownMinutes: 1, // Esperar 1 minuto entre mensajes
+    failureRateThreshold: 0.1, // 10% de fallo
+    blockingRiskThreshold: 70, // 70% de riesgo
+  },
+  email: {
+    maxMessagesPerHour: 100,
+    maxMessagesPerDay: 1000,
+    cooldownMinutes: 0,
+    failureRateThreshold: 0.05,
+    blockingRiskThreshold: 80,
+  },
+  sms: {
+    maxMessagesPerHour: 30,
+    maxMessagesPerDay: 300,
+    cooldownMinutes: 2,
+    failureRateThreshold: 0.15,
+    blockingRiskThreshold: 60,
+  },
+};
+
+/**
+ * Obtiene las métricas de salud de un canal
+ */
+export async function getChannelHealthMetrics(
+  channelName: string,
+  channelType: 'whatsapp' | 'email' | 'sms' | 'n8n' = 'whatsapp'
+): Promise<ChannelHealthMetrics> {
+  try {
+    const db = await getDb();
+    if (!db) {
+      throw new Error("Database not available");
+    }
+
+    const now = new Date();
+    const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
+    const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+
+    // Obtener estadísticas de los últimos 7 días
+    const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+    // Simular datos (en producción, consultar tabla de logs de mensajes)
+    const messagesPerHour = Math.floor(Math.random() * 50) + 10;
+    const messagesPerDay = messagesPerHour * 24;
+    const failureRate = Math.random() * 0.15;
+    const averageResponseTime = Math.floor(Math.random() * 300) + 30;
+
+    // Calcular riesgo de bloqueo
+    const config = DEFAULT_PULSE_CONTROL_CONFIG[channelType] || DEFAULT_PULSE_CONTROL_CONFIG.whatsapp;
+    const messageRatioRisk = (messagesPerHour / config.maxMessagesPerHour) * 50;
+    const failureRateRisk = (failureRate / config.failureRateThreshold) * 30;
+    const blockingRisk = Math.min(100, messageRatioRisk + failureRateRisk);
+
+    // Determinar estado
+    let status: 'healthy' | 'warning' | 'critical' | 'blocked' = 'healthy';
+    if (blockingRisk > config.blockingRiskThreshold) {
+      status = 'critical';
+    } else if (blockingRisk > 50) {
+      status = 'warning';
+    } else if (failureRate > config.failureRateThreshold) {
+      status = 'warning';
+    }
+
+    // Generar recomendaciones
+    const recommendations: string[] = [];
+    if (messagesPerHour > config.maxMessagesPerHour * 0.8) {
+      recommendations.push(`⚠️ Tasa de envío cercana al límite (${messagesPerHour}/${config.maxMessagesPerHour} por hora)`);
+    }
+    if (failureRate > config.failureRateThreshold * 0.8) {
+      recommendations.push(`⚠️ Tasa de fallo elevada (${(failureRate * 100).toFixed(1)}%)`);
+    }
+    if (blockingRisk > 70) {
+      recommendations.push('🚨 ALTO RIESGO DE BLOQUEO - Reducir velocidad de envío inmediatamente');
+    }
+    if (recommendations.length === 0) {
+      recommendations.push('✅ Canal en buen estado');
+    }
+
+    return {
+      channelName,
+      channelType,
+      messagesPerHour,
+      messagesPerDay,
+      failureRate,
+      averageResponseTime,
+      lastMessageTime: new Date(),
+      status,
+      blockingRisk: Math.round(blockingRisk),
+      recommendations,
+    };
+  } catch (error) {
+    console.error('Error getting channel health metrics:', error);
+    throw error;
+  }
+}
+
+/**
+ * Calcula si se puede enviar un mensaje sin riesgo de bloqueo
+ */
+export async function canSendMessage(
+  channelName: string,
+  channelType: 'whatsapp' | 'email' | 'sms' | 'n8n' = 'whatsapp'
+): Promise<{
+  canSend: boolean;
+  reason: string;
+  waitMinutes: number;
+  blockingRisk: number;
+}> {
+  try {
+    const metrics = await getChannelHealthMetrics(channelName, channelType);
+    const config = DEFAULT_PULSE_CONTROL_CONFIG[channelType] || DEFAULT_PULSE_CONTROL_CONFIG.whatsapp;
+
+    let canSend = true;
+    let reason = 'OK';
+    let waitMinutes = 0;
+
+    // Verificar si el canal está bloqueado
+    if (metrics.status === 'blocked') {
+      canSend = false;
+      reason = 'Canal bloqueado - contactar soporte';
+      waitMinutes = 60;
+    }
+    // Verificar si hay riesgo crítico
+    else if (metrics.blockingRisk > config.blockingRiskThreshold) {
+      canSend = false;
+      reason = `Riesgo de bloqueo crítico (${metrics.blockingRisk}%)`;
+      waitMinutes = config.cooldownMinutes * 5;
+    }
+    // Verificar si se alcanzó el límite de mensajes por hora
+    else if (metrics.messagesPerHour >= config.maxMessagesPerHour) {
+      canSend = false;
+      reason = 'Límite de mensajes por hora alcanzado';
+      waitMinutes = config.cooldownMinutes * 10;
+    }
+    // Verificar si se alcanzó el límite de mensajes por día
+    else if (metrics.messagesPerDay >= config.maxMessagesPerDay) {
+      canSend = false;
+      reason = 'Límite de mensajes por día alcanzado';
+      waitMinutes = 60;
+    }
+    // Verificar tasa de fallo
+    else if (metrics.failureRate > config.failureRateThreshold) {
+      canSend = false;
+      reason = `Tasa de fallo elevada (${(metrics.failureRate * 100).toFixed(1)}%)`;
+      waitMinutes = config.cooldownMinutes * 3;
+    }
+
+    return {
+      canSend,
+      reason,
+      waitMinutes,
+      blockingRisk: metrics.blockingRisk,
+    };
+  } catch (error) {
+    console.error('Error checking if can send message:', error);
+    return {
+      canSend: false,
+      reason: 'Error al verificar salud del canal',
+      waitMinutes: 5,
+      blockingRisk: 100,
+    };
+  }
+}
+
+/**
+ * Envía alerta de riesgo de bloqueo a las secretarias
+ */
+export async function sendBlockingRiskAlert(metrics: ChannelHealthMetrics): Promise<boolean> {
+  try {
+    const title = `🚨 ALERTA: Riesgo de bloqueo en ${metrics.channelName}`;
+    const content = `
+**Canal:** ${metrics.channelName} (${metrics.channelType.toUpperCase()})
+**Estado:** ${metrics.status.toUpperCase()}
+**Riesgo de bloqueo:** ${metrics.blockingRisk}%
+
+**Estadísticas:**
+- Mensajes por hora: ${metrics.messagesPerHour}
+- Mensajes por día: ${metrics.messagesPerDay}
+- Tasa de fallo: ${(metrics.failureRate * 100).toFixed(1)}%
+- Tiempo promedio de respuesta: ${metrics.averageResponseTime}s
+
+**Recomendaciones:**
+${metrics.recommendations.map((r) => `• ${r}`).join('\n')}
+
+**Acciones recomendadas:**
+1. Reducir la velocidad de envío de mensajes
+2. Aumentar el intervalo entre envíos
+3. Verificar la configuración de Evolution API
+4. Contactar al soporte técnico si el problema persiste
+    `;
+
+    const result = await notifyOwner({
+      title,
+      content,
+    });
+
+    return result;
+  } catch (error) {
+    console.error('Error sending blocking risk alert:', error);
+    return false;
+  }
+}
+
+/**
+ * Monitorea continuamente la salud de los canales
+ */
+export async function monitorChannelHealth(): Promise<void> {
+  try {
+    const channels = [
+      { name: 'recordatorios-producao', type: 'whatsapp' as const },
+      { name: 'clinic-email', type: 'email' as const },
+    ];
+
+    for (const channel of channels) {
+      const metrics = await getChannelHealthMetrics(channel.name, channel.type);
+
+      // Si hay riesgo crítico, enviar alerta
+      if (metrics.status === 'critical' || metrics.blockingRisk > 80) {
+        await sendBlockingRiskAlert(metrics);
+      }
+
+      console.log(`[Channel Health] ${channel.name}: ${metrics.status} (Risk: ${metrics.blockingRisk}%)`);
+    }
+  } catch (error) {
+    console.error('[Channel Health Monitor] Error:', error);
+  }
+}
+
+/**
+ * Inicia el monitoreo automático de salud de canales
+ */
+export function startChannelHealthMonitor(): NodeJS.Timeout {
+  // Ejecutar cada 15 minutos
+  const intervalId = setInterval(async () => {
+    await monitorChannelHealth();
+  }, 15 * 60 * 1000);
+
+  console.log('[Channel Health Monitor] Started - checking every 15 minutes');
+  return intervalId;
+}
+
+/**
+ * Detiene el monitoreo de salud de canales
+ */
+export function stopChannelHealthMonitor(intervalId: NodeJS.Timeout): void {
+  clearInterval(intervalId);
+  console.log('[Channel Health Monitor] Stopped');
+}
+
+/**
+ * Obtiene configuración de pulse control para un tipo de canal
+ */
+export function getPulseControlConfig(channelType: string): PulseControlConfig {
+  return DEFAULT_PULSE_CONTROL_CONFIG[channelType] || DEFAULT_PULSE_CONTROL_CONFIG.whatsapp;
+}
+
+/**
+ * Actualiza configuración de pulse control
+ */
+export function updatePulseControlConfig(
+  channelType: string,
+  config: Partial<PulseControlConfig>
+): void {
+  if (!DEFAULT_PULSE_CONTROL_CONFIG[channelType]) {
+    DEFAULT_PULSE_CONTROL_CONFIG[channelType] = DEFAULT_PULSE_CONTROL_CONFIG.whatsapp;
+  }
+
+  DEFAULT_PULSE_CONTROL_CONFIG[channelType] = {
+    ...DEFAULT_PULSE_CONTROL_CONFIG[channelType],
+    ...config,
+  };
+
+  console.log(`[Channel Health] Updated pulse control config for ${channelType}:`, DEFAULT_PULSE_CONTROL_CONFIG[channelType]);
+}

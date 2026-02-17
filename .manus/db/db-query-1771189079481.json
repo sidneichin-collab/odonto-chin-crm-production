@@ -1,0 +1,18 @@
+{
+  "query": "UPDATE users \nSET \n  email = 'admin@odontochin.com',\n  password_hash = '$2b$10$qhqUYu4e5boIY7Q2taCOg.LkM1MfH3.7pmzR.YP3Ius7wYnJ729Ei',\n  loginMethod = 'email'\nWHERE openId = 'admin001';\n\nSELECT id, openId, email, role, account_status, loginMethod FROM users WHERE openId = 'admin001';",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3dy73aS7obdDVgV.73116cb9d21b --database Xh2xRagQAoY5NjF5TC3DfV --execute UPDATE users \nSET \n  email = 'admin@odontochin.com',\n  password_hash = '$2b$10$qhqUYu4e5boIY7Q2taCOg.LkM1MfH3.7pmzR.YP3Ius7wYnJ729Ei',\n  loginMethod = 'email'\nWHERE openId = 'admin001';\n\nSELECT id, openId, email, role, account_status, loginMethod FROM users WHERE openId = 'admin001';",
+  "rows": [
+    {
+      "id": "30009",
+      "openId": "admin001",
+      "email": "admin@odontochin.com",
+      "role": "admin",
+      "account_status": "approved",
+      "loginMethod": "email"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\topenId\temail\trole\taccount_status\tloginMethod\n30009\tadmin001\tadmin@odontochin.com\tadmin\tapproved\temail\n",
+  "stderr": "",
+  "execution_time_ms": 158
+}

@@ -1,0 +1,83 @@
+import passport from "passport";
+import { Strategy as GoogleStrategy } from "passport-google-oauth20";
+import * as db from "./db";
+import { ENV } from "./_core/env";
+
+// Configure Google OAuth Strategy
+export function configureGoogleAuth() {
+  // Debug: Log environment variables
+  console.log("[GoogleAuth] Configuring Google OAuth...");
+  console.log("[GoogleAuth] GOOGLE_CLIENT_ID:", ENV.googleClientId ? "SET" : "NOT SET");
+  console.log("[GoogleAuth] GOOGLE_CLIENT_SECRET:", ENV.googleClientSecret ? "SET" : "NOT SET");
+  console.log("[GoogleAuth] APP_URL:", ENV.appUrl);
+  
+  if (!ENV.googleClientId || !ENV.googleClientSecret) {
+    console.error("[GoogleAuth] ERROR: Google OAuth credentials not configured!");
+    return; // Skip Google OAuth configuration if credentials are missing
+  }
+  
+  passport.use(
+    new GoogleStrategy(
+      {
+        clientID: ENV.googleClientId,
+        clientSecret: ENV.googleClientSecret,
+        callbackURL: `${ENV.appUrl}/api/auth/google/callback`,
+      },
+      async (accessToken, refreshToken, profile, done) => {
+        try {
+          // Extract email from Google profile
+          const email = profile.emails?.[0]?.value;
+          
+          if (!email) {
+            return done(new Error("No email found in Google profile"));
+          }
+
+          // Check if user exists
+          let user = await db.getUserByEmail(email);
+
+          // If user doesn't exist, create new user (secretary role by default)
+          if (!user) {
+            user = await db.createUser({
+              email,
+              name: profile.displayName || email.split("@")[0],
+              role: "secretary",
+              status: "active",
+              googleId: profile.id,
+              authProvider: "google",
+            });
+          } else {
+            // Update Google ID if not set
+            if (!user.googleId) {
+              await db.updateUserGoogleId(user.id, profile.id);
+              user.googleId = profile.id;
+            }
+          }
+
+          // Check if user is active
+          if (user.status === "inactive") {
+            return done(new Error("Usuário inativo. Entre em contato com o administrador."));
+          }
+
+          return done(null, user);
+        } catch (error) {
+          return done(error as Error);
+        }
+      }
+    )
+  );
+
+  // Serialize user to session
+  passport.serializeUser((user: any, done) => {
+    done(null, user.id);
+  });
+
+  // Deserialize user from session
+  passport.deserializeUser(async (id: number, done) => {
+    try {
+      const user = await db.getUserById(id);
+      done(null, user);
+    } catch (error) {
+      done(error);
+    }
+  });
+}

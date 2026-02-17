@@ -1,0 +1,9 @@
+{
+  "query": "INSERT INTO whatsapp_numbers (number_name, phone_number, country, channel_type, instance_name, daily_limit, daily_message_count, status) VALUES\n('Canal Recordatorios', '+595981234567', 'Paraguay', 'reminders', 'odontochin-reminders', 1000, 0, 'active'),\n('Canal Integración', '+595981234568', 'Paraguay', 'integration', 'odontochin-integration', 1000, 0, 'active')",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3dy73aS7obdDVgV.73116cb9d21b --database Xh2xRagQAoY5NjF5TC3DfV --execute INSERT INTO whatsapp_numbers (number_name, phone_number, country, channel_type, instance_name, daily_limit, daily_message_count, status) VALUES\n('Canal Recordatorios', '+595981234567', 'Paraguay', 'reminders', 'odontochin-reminders', 1000, 0, 'active'),\n('Canal Integración', '+595981234568', 'Paraguay', 'integration', 'odontochin-integration', 1000, 0, 'active')",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 367
+}

@@ -1,0 +1,13 @@
+{
+  "query": "UPDATE appointments SET chair = NULL WHERE chair = 'NaN' OR chair = 'null' OR chair = '';\nSELECT COUNT(*) as fixed FROM appointments WHERE chair IS NULL;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3dy73aS7obdDVgV.73116cb9d21b --database Xh2xRagQAoY5NjF5TC3DfV --execute UPDATE appointments SET chair = NULL WHERE chair = 'NaN' OR chair = 'null' OR chair = '';\nSELECT COUNT(*) as fixed FROM appointments WHERE chair IS NULL;",
+  "rows": [
+    {
+      "fixed": "0"
+    }
+  ],
+  "messages": [],
+  "stdout": "fixed\n0\n",
+  "stderr": "",
+  "execution_time_ms": 90
+}

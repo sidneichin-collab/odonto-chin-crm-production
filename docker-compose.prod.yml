@@ -1,0 +1,42 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.prod
+    ports:
+      - "8080:8080"
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=mysql://root:root@db:3306/odonto_chin_crm
+      - JWT_SECRET=odonto-chin-jwt-secret-key-2026-super-secure-production
+      - OAUTH_SERVER_URL=https://odontochin-crm.app
+    depends_on:
+      - db
+    restart: always
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  db:
+    image: mysql:8.0
+    environment:
+      - MYSQL_ROOT_PASSWORD=root
+      - MYSQL_DATABASE=odonto_chin_crm
+    volumes:
+      - db_data:/var/lib/mysql
+      - ./backups:/backups
+    restart: always
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  db_data:
+    driver: local

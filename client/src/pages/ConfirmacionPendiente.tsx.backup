@@ -1,0 +1,361 @@
+/**
+ * Confirmación/Pendiente Kanban - Time Grid View with Status Columns + DRAG & DROP
+ * Same structure as AgendamentosKanban but with 9 columns:
+ * - Orto Agendado, Orto Confirmado, Orto Pendiente
+ * - Clínico Agendado, Clínico Confirmado, Clínico Pendiente
+ * - Marketing Agendado, Marketing Confirmado, Marketing Pendiente
+ */
+
+import { useState } from "react";
+import { DndProvider, useDrag, useDrop } from "react-dnd";
+import { HTML5Backend } from "react-dnd-html5-backend";
+import DashboardLayout from "@/components/DashboardLayout";
+import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { trpc } from "@/lib/trpc";
+import { Skeleton } from "@/components/ui/skeleton";
+import { format, addDays, subDays } from "date-fns";
+import { es } from "date-fns/locale";
+import { ChevronLeft, ChevronRight, Sun, Moon, Eye, MessageCircle, GripVertical } from "lucide-react";
+import { useTheme } from "@/contexts/ThemeContext";
+
+// Time slots from 08:00 to 20:00 in 20-minute intervals
+const TIME_SLOTS = [
+  "08:00", "08:20", "08:40",
+  "09:00", "09:20", "09:40",
+  "10:00", "10:20", "10:40",
+  "11:00", "11:20", "11:40",
+  "12:00", "12:20", "12:40",
+  "13:00", "13:20", "13:40",
+  "14:00", "14:20", "14:40",
+  "15:00", "15:20", "15:40",
+  "16:00", "16:20", "16:40",
+  "17:00", "17:20", "17:40",
+  "18:00", "18:20", "18:40",
+  "19:00", "19:20", "19:40",
+];
+
+const STATUS_COLUMNS = [
+  { id: "orto_agendado", name: "Orto Agendado", color: "bg-blue-500", type: "orthodontics", status: "scheduled" },
+  { id: "orto_confirmado", name: "Orto Confirmado", color: "bg-green-500", type: "orthodontics", status: "confirmed" },
+  { id: "orto_pendiente", name: "Orto Pendiente", color: "bg-orange-500", type: "orthodontics", status: "not_confirmed" },
+  { id: "clinico_agendado", name: "Clínico Agendado", color: "bg-blue-500", type: "general_clinic", status: "scheduled" },
+  { id: "clinico_confirmado", name: "Clínico Confirmado", color: "bg-green-500", type: "general_clinic", status: "confirmed" },
+  { id: "clinico_pendiente", name: "Clínico Pendiente", color: "bg-orange-500", type: "general_clinic", status: "not_confirmed" },
+  { id: "marketing_agendado", name: "Marketing Agendado", color: "bg-blue-500", type: "marketing_evaluation", status: "scheduled" },
+  { id: "marketing_confirmado", name: "Marketing Confirmado", color: "bg-green-500", type: "marketing_evaluation", status: "confirmed" },
+  { id: "marketing_pendiente", name: "Marketing Pendiente", color: "bg-orange-500", type: "marketing_evaluation", status: "not_confirmed" },
+];
+
+interface AppointmentData {
+  id: number;
+  patientId: number;
+  patientName: string | null;
+  appointmentDate: Date | string;
+  appointmentType: string;
+  status: string;
+  notes: string | null;
+}
+
+// Draggable Card Component
+function DraggableCard({ appointment, onViewDetails }: { appointment: AppointmentData; onViewDetails: (app: AppointmentData) => void }) {
+  const [{ isDragging }, drag, dragPreview] = useDrag(() => ({
+    type: "appointment",
+    item: { id: appointment.id, currentStatus: appointment.status, currentType: appointment.appointmentType },
+    collect: (monitor) => ({
+      isDragging: !!monitor.isDragging(),
+    }),
+  }));
+
+  return (
+    <div
+      ref={drag}
+      className={`p-2 rounded-lg shadow-sm cursor-move transition-all ${
+        isDragging ? "opacity-50 scale-95" : "opacity-100 hover:shadow-md"
+      } bg-card border border-border`}
+    >
+      <div className="flex items-start gap-2">
+        <GripVertical className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" />
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium truncate">{appointment.patientName || "Sin nombre"}</p>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-6 px-2 mt-1 text-xs"
+            onClick={() => onViewDetails(appointment)}
+          >
+            <Eye className="h-3 w-3 mr-1" />
+            Ver
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Droppable Cell Component
+function DroppableCell({
+  columnId,
+  timeSlot,
+  appointments,
+  onDrop,
+  onViewDetails,
+}: {
+  columnId: string;
+  timeSlot: string;
+  appointments: AppointmentData[];
+  onDrop: (appointmentId: number, newColumn: string) => void;
+  onViewDetails: (app: AppointmentData) => void;
+}) {
+  const [{ isOver }, drop] = useDrop<{ id: number; currentStatus: string; currentType: string }, void, { isOver: boolean }>(() => ({
+    accept: "appointment",
+    drop: (item: { id: number; currentStatus: string; currentType: string }) => {
+      onDrop(item.id, columnId);
+    },
+    collect: (monitor) => ({
+      isOver: !!monitor.isOver(),
+    }),
+  }));
+
+  return (
+    <div
+      ref={drop}
+      className={`min-h-[60px] p-2 border-r border-b border-border transition-colors ${
+        isOver ? "bg-accent/50" : ""
+      }`}
+    >
+      <div className="space-y-2">
+        {appointments.map((appointment) => (
+          <DraggableCard
+            key={appointment.id}
+            appointment={appointment}
+            onViewDetails={onViewDetails}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ConfirmacionPendienteContent() {
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [selectedAppointment, setSelectedAppointment] = useState<AppointmentData | null>(null);
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const { theme, toggleTheme } = useTheme();
+
+  const utils = trpc.useUtils();
+
+  // Load appointments for selected date
+  const { data: appointments, isLoading } = trpc.appointments.listByDate.useQuery({
+    date: selectedDate.toISOString().split('T')[0],
+  });
+
+  const updateAppointmentMutation = trpc.appointments.update.useMutation({
+    onSuccess: () => {
+      utils.appointments.listByDate.invalidate();
+    },
+  });
+
+  const handlePreviousDay = () => setSelectedDate(subDays(selectedDate, 1));
+  const handleNextDay = () => setSelectedDate(addDays(selectedDate, 1));
+  const handleToday = () => setSelectedDate(new Date());
+
+  const handleViewDetails = (appointment: AppointmentData) => {
+    setSelectedAppointment(appointment);
+    setShowDetailsModal(true);
+  };
+
+  const handleDrop = (appointmentId: number, newColumnId: string) => {
+    const column = STATUS_COLUMNS.find((c) => c.id === newColumnId);
+    if (!column) return;
+
+    // Update appointment status and type
+    updateAppointmentMutation.mutate({
+      id: appointmentId,
+      status: column.status as any,
+    });
+  };
+
+  // Group appointments by time slot and column
+  const getAppointmentsForCell = (timeSlot: string, columnId: string) => {
+    if (!appointments) return [];
+    
+    const column = STATUS_COLUMNS.find((c) => c.id === columnId);
+    if (!column) return [];
+
+    return appointments.filter((apt: any) => {
+      const aptTime = apt.appointmentTime || "";
+      return (
+        aptTime === timeSlot &&
+        apt.appointmentType === column.type &&
+        apt.status === column.status
+      );
+    });
+  };
+
+  // Count appointments per column
+  const getColumnCount = (columnId: string) => {
+    if (!appointments) return 0;
+    
+    const column = STATUS_COLUMNS.find((c) => c.id === columnId);
+    if (!column) return 0;
+
+    return appointments.filter((apt: any) => 
+      apt.appointmentType === column.type && apt.status === column.status
+    ).length;
+  };
+
+  return (
+    <DashboardLayout>
+      <div className="flex flex-col h-full gap-6 p-6">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold">Confirmación/Pendiente</h1>
+            <p className="text-muted-foreground">
+              {format(selectedDate, "EEEE, d 'de' MMMM 'de' yyyy", { locale: es })}
+            </p>
+          </div>
+
+          {/* Controls */}
+          <div className="flex items-center gap-3">
+            {/* Theme toggle */}
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={toggleTheme}
+              title="Cambiar tema"
+            >
+              {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            </Button>
+
+            {/* Date navigation */}
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="icon" onClick={handlePreviousDay}>
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <Button variant="outline" onClick={handleToday}>
+                Hoy
+              </Button>
+              <Button variant="outline" size="icon" onClick={handleNextDay}>
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        </div>
+
+        {/* Main Content: Grid + Calendar */}
+        <div className="flex gap-6 flex-1 overflow-hidden">
+          {/* Kanban Grid */}
+          <div className="flex-1 overflow-auto border rounded-lg">
+            {isLoading ? (
+              <div className="p-8 space-y-4">
+                <Skeleton className="h-12 w-full" />
+                <Skeleton className="h-64 w-full" />
+              </div>
+            ) : (
+              <div className="min-w-max">
+                {/* Column Headers */}
+                <div className="sticky top-0 z-10 bg-background border-b grid" style={{ gridTemplateColumns: `80px repeat(${STATUS_COLUMNS.length}, 180px)` }}>
+                  <div className="p-3 border-r font-semibold text-sm">Hora</div>
+                  {STATUS_COLUMNS.map((column) => (
+                    <div key={column.id} className={`p-3 border-r ${column.color} text-white font-semibold text-sm text-center`}>
+                      <div>{column.name}</div>
+                      <div className="text-xs opacity-90 mt-1">({getColumnCount(column.id)})</div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Time Slots Rows */}
+                {TIME_SLOTS.map((timeSlot) => (
+                  <div key={timeSlot} className="grid" style={{ gridTemplateColumns: `80px repeat(${STATUS_COLUMNS.length}, 180px)` }}>
+                    <div className="p-3 border-r border-b font-medium text-sm text-muted-foreground bg-muted/30">
+                      {timeSlot}
+                    </div>
+                    {STATUS_COLUMNS.map((column) => (
+                      <DroppableCell
+                        key={`${timeSlot}-${column.id}`}
+                        columnId={column.id}
+                        timeSlot={timeSlot}
+                        appointments={getAppointmentsForCell(timeSlot, column.id)}
+                        onDrop={handleDrop}
+                        onViewDetails={handleViewDetails}
+                      />
+                    ))}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Calendar Sidebar */}
+          <div className="w-80 flex-shrink-0">
+            <div className="border rounded-lg p-4 bg-card">
+              <Calendar
+                mode="single"
+                selected={selectedDate}
+                onSelect={(date) => date && setSelectedDate(date)}
+                locale={es}
+                className="rounded-md"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Details Modal */}
+        <Dialog open={showDetailsModal} onOpenChange={setShowDetailsModal}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Detalles de la Cita</DialogTitle>
+            </DialogHeader>
+            {selectedAppointment && (
+              <div className="space-y-4">
+                <div>
+                  <p className="text-sm font-medium">Paciente</p>
+                  <p className="text-lg">{selectedAppointment.patientName || "Sin nombre"}</p>
+                </div>
+                <div>
+                  <p className="text-sm font-medium">Fecha</p>
+                  <p>{format(new Date(selectedAppointment.appointmentDate), "d 'de' MMMM 'de' yyyy", { locale: es })}</p>
+                </div>
+                <div>
+                  <p className="text-sm font-medium">Tipo</p>
+                  <p className="capitalize">{selectedAppointment.appointmentType}</p>
+                </div>
+                <div>
+                  <p className="text-sm font-medium">Estado</p>
+                  <p className="capitalize">{selectedAppointment.status}</p>
+                </div>
+                {selectedAppointment.notes && (
+                  <div>
+                    <p className="text-sm font-medium">Notas</p>
+                    <p className="text-sm text-muted-foreground">{selectedAppointment.notes}</p>
+                  </div>
+                )}
+                <Button
+                  className="w-full"
+                  onClick={() => {
+                    // Open WhatsApp (would need patient phone number)
+                    window.open(`https://wa.me/`, "_blank");
+                  }}
+                >
+                  <MessageCircle className="h-4 w-4 mr-2" />
+                  Enviar WhatsApp
+                </Button>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
+      </div>
+    </DashboardLayout>
+  );
+}
+
+export default function ConfirmacionPendiente() {
+  return (
+    <DndProvider backend={HTML5Backend}>
+      <ConfirmacionPendienteContent />
+    </DndProvider>
+  );
+}

@@ -1,0 +1,8 @@
+{
+  "query": "ALTER TABLE users ADD COLUMN clinic_id INT NULL;\n\nINSERT INTO users (openId, name, email, loginMethod, role, clinic_id, createdAt, updatedAt, lastSignedIn)\nVALUES (\n  'admin001',\n  'Administrador',\n  'admin@odontochin.com',\n  'email',\n  'admin',\n  NULL,\n  CURRENT_TIMESTAMP,\n  CURRENT_TIMESTAMP,\n  CURRENT_TIMESTAMP\n);\n\nSELECT id, openId, name, email, role FROM users WHERE openId = 'admin001';",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3dy73aS7obdDVgV.73116cb9d21b --database Xh2xRagQAoY5NjF5TC3DfV --execute ALTER TABLE users ADD COLUMN clinic_id INT NULL;\n\nINSERT INTO users (openId, name, email, loginMethod, role, clinic_id, createdAt, updatedAt, lastSignedIn)\nVALUES (\n  'admin001',\n  'Administrador',\n  'admin@odontochin.com',\n  'email',\n  'admin',\n  NULL,\n  CURRENT_TIMESTAMP,\n  CURRENT_TIMESTAMP,\n  CURRENT_TIMESTAMP\n);\n\nSELECT id, openId, name, email, role FROM users WHERE openId = 'admin001';",
+  "returncode": 1,
+  "logs": [
+    "ERROR 1060 (42S21) at line 1: Duplicate column name 'clinic_id'"
+  ]
+}

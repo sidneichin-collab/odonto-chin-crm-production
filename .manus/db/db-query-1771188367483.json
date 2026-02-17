@@ -1,0 +1,13 @@
+{
+  "query": "CREATE TABLE IF NOT EXISTS clinics (\n  id INT AUTO_INCREMENT PRIMARY KEY,\n  name VARCHAR(255) NOT NULL,\n  country VARCHAR(50) NOT NULL,\n  city VARCHAR(100) NOT NULL,\n  address TEXT,\n  timezone VARCHAR(50) NOT NULL DEFAULT 'America/Asuncion',\n  currency VARCHAR(3) NOT NULL DEFAULT 'PYG',\n  phone VARCHAR(20),\n  email VARCHAR(320),\n  status ENUM('active', 'inactive', 'coming_soon') NOT NULL DEFAULT 'active',\n  createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,\n  updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP NOT NULL,\n  \n  INDEX idx_country (country),\n  INDEX idx_status (status)\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;\n\nSELECT 'Clinics table created' as result;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3dy73aS7obdDVgV.73116cb9d21b --database Xh2xRagQAoY5NjF5TC3DfV --execute CREATE TABLE IF NOT EXISTS clinics (\n  id INT AUTO_INCREMENT PRIMARY KEY,\n  name VARCHAR(255) NOT NULL,\n  country VARCHAR(50) NOT NULL,\n  city VARCHAR(100) NOT NULL,\n  address TEXT,\n  timezone VARCHAR(50) NOT NULL DEFAULT 'America/Asuncion',\n  currency VARCHAR(3) NOT NULL DEFAULT 'PYG',\n  phone VARCHAR(20),\n  email VARCHAR(320),\n  status ENUM('active', 'inactive', 'coming_soon') NOT NULL DEFAULT 'active',\n  createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,\n  updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP NOT NULL,\n  \n  INDEX idx_country (country),\n  INDEX idx_status (status)\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;\n\nSELECT 'Clinics table created' as result;",
+  "rows": [
+    {
+      "result": "Clinics table created"
+    }
+  ],
+  "messages": [],
+  "stdout": "result\nClinics table created\n",
+  "stderr": "",
+  "execution_time_ms": 211
+}

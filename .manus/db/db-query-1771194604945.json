@@ -1,0 +1,9 @@
+{
+  "query": "CREATE TABLE IF NOT EXISTS `whatsappConversations` (\n  `id` int NOT NULL AUTO_INCREMENT PRIMARY KEY,\n  `patientId` int NOT NULL,\n  `channelId` int NOT NULL,\n  `phoneNumber` varchar(20) NOT NULL,\n  `lastMessage` text,\n  `lastMessageAt` timestamp NULL,\n  `status` enum('unread', 'read', 'archived') NOT NULL DEFAULT 'unread',\n  `unreadCount` int NOT NULL DEFAULT 0,\n  `createdAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,\n  `updatedAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,\n  INDEX `idx_status` (`status`),\n  INDEX `idx_patient` (`patientId`)\n);",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3dy73aS7obdDVgV.73116cb9d21b --database Xh2xRagQAoY5NjF5TC3DfV --execute CREATE TABLE IF NOT EXISTS `whatsappConversations` (\n  `id` int NOT NULL AUTO_INCREMENT PRIMARY KEY,\n  `patientId` int NOT NULL,\n  `channelId` int NOT NULL,\n  `phoneNumber` varchar(20) NOT NULL,\n  `lastMessage` text,\n  `lastMessageAt` timestamp NULL,\n  `status` enum('unread', 'read', 'archived') NOT NULL DEFAULT 'unread',\n  `unreadCount` int NOT NULL DEFAULT 0,\n  `createdAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,\n  `updatedAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,\n  INDEX `idx_status` (`status`),\n  INDEX `idx_patient` (`patientId`)\n);",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 186
+}

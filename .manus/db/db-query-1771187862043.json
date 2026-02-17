@@ -1,0 +1,17 @@
+{
+  "query": "INSERT INTO users (openId, name, email, loginMethod, role, clinic_id, createdAt, updatedAt, lastSignedIn)\nVALUES (\n  'admin001',\n  'Administrador',\n  'admin@odontochin.com',\n  'email',\n  'admin',\n  NULL,\n  CURRENT_TIMESTAMP,\n  CURRENT_TIMESTAMP,\n  CURRENT_TIMESTAMP\n);\n\nSELECT id, openId, name, email, role FROM users WHERE openId = 'admin001';",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3dy73aS7obdDVgV.73116cb9d21b --database Xh2xRagQAoY5NjF5TC3DfV --execute INSERT INTO users (openId, name, email, loginMethod, role, clinic_id, createdAt, updatedAt, lastSignedIn)\nVALUES (\n  'admin001',\n  'Administrador',\n  'admin@odontochin.com',\n  'email',\n  'admin',\n  NULL,\n  CURRENT_TIMESTAMP,\n  CURRENT_TIMESTAMP,\n  CURRENT_TIMESTAMP\n);\n\nSELECT id, openId, name, email, role FROM users WHERE openId = 'admin001';",
+  "rows": [
+    {
+      "id": "30009",
+      "openId": "admin001",
+      "name": "Administrador",
+      "email": "admin@odontochin.com",
+      "role": "admin"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\topenId\tname\temail\trole\n30009\tadmin001\tAdministrador\tadmin@odontochin.com\tadmin\n",
+  "stderr": "",
+  "execution_time_ms": 69
+}

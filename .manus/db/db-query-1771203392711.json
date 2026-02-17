@@ -1,0 +1,13 @@
+{
+  "query": "SET @clinic_id = 1;\n\nINSERT INTO patients (clinic_id, name, phone, emergency_contact, email, ubicacion, treatment_type, origin, notes, created_at, updated_at)\nSELECT 1, 'María González', '+595981234567', '+595981234999', 'maria.gonzalez@example.com', 'Asunción', treatment_type, 'Referido', 'Test patient', NOW(), NOW()\nFROM patients LIMIT 1;\n\nINSERT INTO patients (clinic_id, name, phone, emergency_contact, email, ubicacion, treatment_type, origin, notes, created_at, updated_at)\nSELECT 1, 'Carlos Rodríguez', '+595982345678', '+595982345999', 'carlos.rodriguez@example.com', 'Asunción', treatment_type, 'Referido', 'Test patient', NOW(), NOW()\nFROM patients LIMIT 1;\n\nSELECT COUNT(*) as total FROM patients WHERE notes = 'Test patient';",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3dy73aS7obdDVgV.73116cb9d21b --database Xh2xRagQAoY5NjF5TC3DfV --execute SET @clinic_id = 1;\n\nINSERT INTO patients (clinic_id, name, phone, emergency_contact, email, ubicacion, treatment_type, origin, notes, created_at, updated_at)\nSELECT 1, 'María González', '+595981234567', '+595981234999', 'maria.gonzalez@example.com', 'Asunción', treatment_type, 'Referido', 'Test patient', NOW(), NOW()\nFROM patients LIMIT 1;\n\nINSERT INTO patients (clinic_id, name, phone, emergency_contact, email, ubicacion, treatment_type, origin, notes, created_at, updated_at)\nSELECT 1, 'Carlos Rodríguez', '+595982345678', '+595982345999', 'carlos.rodriguez@example.com', 'Asunción', treatment_type, 'Referido', 'Test patient', NOW(), NOW()\nFROM patients LIMIT 1;\n\nSELECT COUNT(*) as total FROM patients WHERE notes = 'Test patient';",
+  "rows": [
+    {
+      "total": "2"
+    }
+  ],
+  "messages": [],
+  "stdout": "total\n2\n",
+  "stderr": "",
+  "execution_time_ms": 98
+}

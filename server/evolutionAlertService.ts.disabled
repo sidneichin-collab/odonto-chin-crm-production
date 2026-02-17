@@ -1,0 +1,143 @@
+import { notifyOwner } from '../_core/notification';
+
+/**
+ * SERVIÇO DE ALERTAS E RECONEXÃO AUTOMÁTICA
+ * 
+ * Responsabilidades:
+ * 1. Enviar alertas ao dono quando Evolution falha
+ * 2. Tentar reconectar automaticamente
+ * 3. Registrar histórico de falhas
+ * 4. Escalar alertas se problema persistir
+ */
+
+interface AlertEvent {
+  timestamp: Date;
+  type: 'warning' | 'critical' | 'resolved';
+  message: string;
+  failureCount: number;
+}
+
+class EvolutionAlertService {
+  private alertHistory: AlertEvent[] = [];
+  private alertThrottleMap: Map<string, Date> = new Map();
+  private throttleDelayMs = 5 * 60 * 1000; // 5 minutos entre alertas do mesmo tipo
+
+  /**
+   * Registrar evento de alerta
+   */
+  async logAlert(type: 'warning' | 'critical' | 'resolved', message: string, failureCount: number) {
+    const event: AlertEvent = {
+      timestamp: new Date(),
+      type,
+      message,
+      failureCount,
+    };
+
+    this.alertHistory.push(event);
+
+    // Manter apenas últimas 100 alertas
+    if (this.alertHistory.length > 100) {
+      this.alertHistory = this.alertHistory.slice(-100);
+    }
+
+    console.log(`[EvolutionAlert] ${type.toUpperCase()}: ${message}`);
+  }
+
+  /**
+   * Enviar alerta ao dono (com throttle)
+   */
+  async sendAlert(type: 'warning' | 'critical', message: string, failureCount: number) {
+    const throttleKey = `${type}`;
+    const lastAlert = this.alertThrottleMap.get(throttleKey);
+    const now = new Date();
+
+    // Não enviar alertas muito frequentes do mesmo tipo
+    if (lastAlert && now.getTime() - lastAlert.getTime() < this.throttleDelayMs) {
+      console.log(`[EvolutionAlert] Alerta throttled: ${throttleKey}`);
+      return;
+    }
+
+    this.alertThrottleMap.set(throttleKey, now);
+
+    const title = type === 'critical' ? '🚨 CRÍTICO' : '⚠️ AVISO';
+    const content = `${message}\n\nFalhas consecutivas: ${failureCount}\nHora: ${now.toLocaleString()}`;
+
+    try {
+      await notifyOwner({ title, content });
+      await this.logAlert(type, message, failureCount);
+    } catch (error) {
+      console.error('[EvolutionAlert] Erro ao enviar notificação:', error);
+    }
+  }
+
+  /**
+   * Alerta de desconexão
+   */
+  async alertDisconnected(instanceName: string, failureCount: number) {
+    if (failureCount === 1) {
+      // Primeira falha - apenas warning
+      await this.sendAlert(
+        'warning',
+        `Evolution API - Instância ${instanceName} desconectada`,
+        failureCount
+      );
+    } else if (failureCount >= 3) {
+      // Terceira falha ou mais - crítico
+      await this.sendAlert(
+        'critical',
+        `Evolution API - Instância ${instanceName} OFFLINE!\n\nAção necessária:\n1. Acessar Evolution Manager\n2. Conectar WhatsApp novamente\n3. Verificar API Key`,
+        failureCount
+      );
+    }
+  }
+
+  /**
+   * Alerta de reconexão bem-sucedida
+   */
+  async alertReconnected(instanceName: string) {
+    await this.logAlert('resolved', `Evolution API - Instância ${instanceName} reconectada`, 0);
+
+    try {
+      await notifyOwner({
+        title: '✅ Evolution API - Reconectada',
+        content: `A instância ${instanceName} foi reconectada com sucesso.\n\nMensagens estão sendo enviadas normalmente.`,
+      });
+    } catch (error) {
+      console.error('[EvolutionAlert] Erro ao enviar notificação de reconexão:', error);
+    }
+  }
+
+  /**
+   * Obter histórico de alertas
+   */
+  getAlertHistory(limit: number = 50): AlertEvent[] {
+    return this.alertHistory.slice(-limit);
+  }
+
+  /**
+   * Limpar histórico
+   */
+  clearHistory() {
+    this.alertHistory = [];
+    this.alertThrottleMap.clear();
+  }
+
+  /**
+   * Obter estatísticas
+   */
+  getStats() {
+    const warnings = this.alertHistory.filter((a) => a.type === 'warning').length;
+    const criticals = this.alertHistory.filter((a) => a.type === 'critical').length;
+    const resolved = this.alertHistory.filter((a) => a.type === 'resolved').length;
+
+    return {
+      totalAlerts: this.alertHistory.length,
+      warnings,
+      criticals,
+      resolved,
+      lastAlert: this.alertHistory[this.alertHistory.length - 1] || null,
+    };
+  }
+}
+
+export const evolutionAlert = new EvolutionAlertService();
