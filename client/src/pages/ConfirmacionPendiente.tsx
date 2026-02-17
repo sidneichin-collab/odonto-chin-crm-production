@@ -78,7 +78,7 @@ const COLUMNS = [
 
 export default function ConfirmacionPendiente() {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-  const [treatmentFilter, setTreatmentFilter] = useState<'all' | 'orthodontics' | 'general_clinic'>('all');
+  const [treatmentFilter, setTreatmentFilter] = useState<'all' | 'orthodontics' | 'general_clinic' | 'marketing'>('all');
   const [activeId, setActiveId] = useState<number | null>(null);
 
   // Load appointments
@@ -107,11 +107,12 @@ export default function ConfirmacionPendiente() {
 
   // Calculate stats
   const stats = useMemo(() => {
-    if (!appointments) return { total: 0, orthodontics: 0, clinic: 0 };
+    if (!appointments) return { total: 0, orthodontics: 0, clinic: 0, marketing: 0 };
     return {
       total: appointments.length,
       orthodontics: appointments.filter(a => a.appointmentType === 'orthodontics').length,
       clinic: appointments.filter(a => a.appointmentType === 'general_clinic').length,
+      marketing: appointments.filter(a => a.appointmentType === 'marketing').length,
     };
   }, [appointments]);
 
@@ -150,6 +151,9 @@ export default function ConfirmacionPendiente() {
   const getTreatmentBadge = (type: string) => {
     if (type === 'orthodontics') {
       return <span className="px-2 py-1 text-xs rounded-full bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300">🦷 Ortodoncio</span>;
+    }
+    if (type === 'marketing') {
+      return <span className="px-2 py-1 text-xs rounded-full bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300">📢 Marketing</span>;
     }
     return <span className="px-2 py-1 text-xs rounded-full bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-300">🏥 Clínico</span>;
   };

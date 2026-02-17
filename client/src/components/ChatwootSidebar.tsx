@@ -7,12 +7,13 @@ import { es } from "date-fns/locale";
 interface ChatwootSidebarProps {
   selectedDate: Date;
   onDateChange: (date: Date) => void;
-  treatmentFilter: 'all' | 'orthodontics' | 'general_clinic';
-  onFilterChange: (filter: 'all' | 'orthodontics' | 'general_clinic') => void;
+  treatmentFilter: 'all' | 'orthodontics' | 'general_clinic' | 'marketing';
+  onFilterChange: (filter: 'all' | 'orthodontics' | 'general_clinic' | 'marketing') => void;
   stats?: {
     total: number;
     orthodontics: number;
     clinic: number;
+    marketing: number;
   };
 }
 
@@ -21,7 +22,7 @@ export function ChatwootSidebar({
   onDateChange,
   treatmentFilter,
   onFilterChange,
-  stats = { total: 0, orthodontics: 0, clinic: 0 }
+  stats = { total: 0, orthodontics: 0, clinic: 0, marketing: 0 }
 }: ChatwootSidebarProps) {
   const handlePreviousDay = () => onDateChange(subDays(selectedDate, 1));
   const handleNextDay = () => onDateChange(addDays(selectedDate, 1));
@@ -97,6 +98,19 @@ export function ChatwootSidebar({
               <span className="float-right text-xs opacity-70">{stats.clinic}</span>
             )}
           </button>
+          <button
+            onClick={() => onFilterChange('marketing')}
+            className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors ${
+              treatmentFilter === 'marketing'
+                ? 'bg-primary text-primary-foreground'
+                : 'hover:bg-muted'
+            }`}
+          >
+            📢 Marketing
+            {stats.marketing > 0 && (
+              <span className="float-right text-xs opacity-70">{stats.marketing}</span>
+            )}
+          </button>
         </div>
       </div>
 
@@ -133,6 +147,10 @@ export function ChatwootSidebar({
             <div className="flex justify-between text-cyan-600 dark:text-cyan-400">
               <span>Clínico:</span>
               <span className="font-semibold">{stats.clinic}</span>
+            </div>
+            <div className="flex justify-between text-orange-600 dark:text-orange-400">
+              <span>Marketing:</span>
+              <span className="font-semibold">{stats.marketing}</span>
             </div>
           </div>
         </div>
